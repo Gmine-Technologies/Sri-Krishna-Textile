@@ -32,7 +32,17 @@ const sign = u => jwt.sign({ id: u.id, role: u.role }, SECRET, { expiresIn: '7d'
 const pubU = u => ({ id: u.id, name: u.name, email: u.email, role: u.role, phone: u.phone || '', address: u.address || '' });
 const ph = x => String(x || '').replace(/\D/g, '').slice(-10);
 
+let dbConnected = false;
+let dbError = null;
+
 app.use('/api', async (q, s, n) => {
+  if (q.path === '/health' || q.path === '/db-status') return n();
+  if (!dbConnected) {
+    return s.status(503).json({
+      error: 'Database not connected: ' + (dbError || 'Please check your database credentials in Hostinger.'),
+      hint: 'Visit /api/db-status for connection diagnostic details'
+    });
+  }
   const h = q.headers.authorization || '';
   if (h.startsWith('Bearer ')) {
     try {
@@ -53,8 +63,21 @@ const limit = (q, s, n) => {
 };
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// ---------- auth ----------
-app.get('/api/health', (q, s) => s.json({ ok: true }));
+// ---------- diagnostics & health ----------
+app.get('/api/health', (q, s) => s.json({ ok: dbConnected, dbConnected }));
+app.get('/api/db-status', (q, s) => {
+  s.json({
+    server: 'online',
+    dbConnected,
+    dbError,
+    dbConfig: {
+      host: process.env.DB_HOST || 'localhost',
+      port: process.env.DB_PORT || 3306,
+      user: process.env.DB_USER || 'root',
+      database: process.env.DB_NAME || 'sreekrishna_store'
+    }
+  });
+});
 
 app.post('/api/auth/register', limit, wrap(async (q, s) => {
   const name = String(q.body.name || '').trim().slice(0, 80), email = String(q.body.email || '').trim().toLowerCase(), pw = String(q.body.password || '');
@@ -387,22 +410,30 @@ app.use('/uploads', express.static(UP, { maxAge: '7d' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 async function startServer() {
+  // 1. Start HTTP server immediately so Hostinger's proxy never receives a 503
+  const server = app.listen(PORT, () => {
+    console.log(`Sreekrishna Textiles running at http://localhost:${PORT}`);
+  });
+
+  // 2. Connect to MySQL database in background
   try {
+    console.log(`Connecting to MySQL database '${process.env.DB_NAME || 'sreekrishna_store'}' at ${process.env.DB_HOST || 'localhost'}...`);
     await db.init();
     await seed(db);
-    app.listen(PORT, () => console.log(`Sreekrishna Textiles running at http://localhost:${PORT}`));
+    dbConnected = true;
+    dbError = null;
+    console.log('Database connected and initialized successfully!');
   } catch (e) {
-    if (e.code === 'ECONNREFUSED') {
-      console.error(`\n[Database Connection Error] Could not connect to MySQL server at ${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || 3306}.`);
-      console.error('Please verify that your MySQL service is running and credentials in .env are correct.\n');
-    } else if (e.code === 'ER_ACCESS_DENIED_ERROR') {
-      console.error(`\n[Database Authentication Error] MySQL Access Denied for user '${process.env.DB_USER || 'root'}'.`);
-      console.error('Please verify DB_USER and DB_PASSWORD in your .env file.\n');
-    } else {
-      console.error('\n[Server Startup Error]', e.message || e);
-    }
-    process.exit(1);
+    dbConnected = false;
+    dbError = e.message || String(e);
+    console.error('\n[Database Connection Notice]:', dbError);
+    console.error('Web server is active. Check http://your-domain/api/db-status to inspect the database connection status.\n');
   }
+
+  return server;
 }
 
 startServer();
+
+module.exports = app;
+
