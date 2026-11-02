@@ -1,0 +1,9 @@
+{
+  "name": "sreekrishna-store",
+  "version": "1.0.0",
+  "description": "Sreekrishna Textiles - ecommerce site with Express + SQLite backend",
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "reseed": "node -e \"require('fs').rmSync('data/store.db',{force:true});console.log('db removed, restart to reseed')\"" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "bcryptjs": "^2.4.3", "better-sqlite3": "^11.3.0", "express": "^4.19.2", "jsonwebtoken": "^9.0.2" }
+}
