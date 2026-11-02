@@ -1,6 +1,6 @@
 # Sreekrishna Textiles: store + backend
 
-Express + SQLite backend that also serves the website (`public/index.html`).
+Express + MySQL backend that also serves the website (`public/index.html`).
 The site auto-detects the backend: if `/api/health` answers, it uses the live database;
 otherwise it falls back to browser-only demo mode.
 
@@ -9,9 +9,10 @@ otherwise it falls back to browser-only demo mode.
 npm install
 npm start            # http://localhost:3000
 ```
-First start creates `data/store.db` and seeds 70 products, 5 sample customers
-(password `customer123`), sample orders (Jan-Oct) and monthly expenses.
-`npm run reseed` deletes the database so the next start re-seeds it.
+On first start, it automatically connects to MySQL, creates the database (`sreekrishna_store` by default)
+and tables, and seeds 70 products, 5 sample customers (password `customer123`), sample orders (Jan-Oct)
+and monthly expenses.
+`npm run reseed` resets and reseeds the database tables.
 
 ## Logins
 | Role | How |
@@ -19,13 +20,19 @@ First start creates `data/store.db` and seeds 70 products, 5 sample customers
 | Admin | Login page, **Admin** tab: `admin@sreekrishna.demo` / `admin123` |
 | Customer | Register on the site, or use e.g. `priya@example.com` / `customer123` |
 
-## Configuration (environment variables)
-| Variable | Purpose |
-|---|---|
-| `PORT` | default 3000 |
-| `JWT_SECRET` | **set this in production** (long random string) |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | admin account created on first start (**change the default password**) |
-| `DB_FILE` | custom SQLite file path |
+## Configuration (`.env`)
+Configure your database and app in [.env](file:///c:/Users/ramas/Downloads/Sri%20krishna%20textiles/.env):
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | 3000 | Web server port |
+| `JWT_SECRET` | dev secret | **Set in production** (secure random string) |
+| `DB_HOST` | localhost | MySQL host |
+| `DB_PORT` | 3306 | MySQL port |
+| `DB_USER` | root | MySQL username |
+| `DB_PASSWORD` | empty | MySQL password |
+| `DB_NAME` | sreekrishna_store | MySQL database name |
+| `ADMIN_EMAIL` | admin@sreekrishna.demo | Admin email created on first run |
+| `ADMIN_PASSWORD` | admin123 | Admin password created on first run |
 
 ## What the backend does
 * Passwords hashed with bcrypt, JWT login (7 days), login rate limiting, admin/customer roles enforced on the server.

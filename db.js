@@ -1,19 +1,215 @@
-const Database = require('better-sqlite3');
-const path = require('path'), fs = require('fs');
-fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
-const db = new Database(process.env.DB_FILE || path.join(__dirname, 'data', 'store.db'));
-db.pragma('journal_mode = WAL'); db.pragma('foreign_keys = ON');
-db.exec(`
-CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL, hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'customer', created TEXT);
-CREATE TABLE IF NOT EXISTS products(id TEXT PRIMARY KEY, name TEXT, cat TEXT, sub TEXT, price INTEGER, disc INTEGER, mrp INTEGER, cost INTEGER, col TEXT, fab TEXT, rating REAL, rev INTEGER, stock INTEGER, sku TEXT, occ TEXT, descr TEXT, img TEXT, created TEXT);
-CREATE TABLE IF NOT EXISTS orders(id TEXT PRIMARY KEY, user_id INTEGER, email TEXT, name TEXT, address TEXT, total INTEGER, cost INTEGER, pay TEXT, status TEXT, created TEXT);
-CREATE TABLE IF NOT EXISTS order_items(id INTEGER PRIMARY KEY, order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE, product_id TEXT, name TEXT, col TEXT, qty INTEGER, price INTEGER, cost INTEGER);
-CREATE TABLE IF NOT EXISTS expenses(id INTEGER PRIMARY KEY, month TEXT, kind TEXT, amount INTEGER);
-CREATE TABLE IF NOT EXISTS order_events(id INTEGER PRIMARY KEY, order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE, status TEXT, note TEXT, created TEXT);
-CREATE TABLE IF NOT EXISTS settings(k TEXT PRIMARY KEY, v TEXT);
-CREATE INDEX IF NOT EXISTS ix_orders_created ON orders(created);
-CREATE INDEX IF NOT EXISTS ix_events_order ON order_events(order_id);
-`);
-const addCol = (t, c, def) => { if (!db.prepare(`PRAGMA table_info(${t})`).all().some(r => r.name === c)) db.exec(`ALTER TABLE ${t} ADD COLUMN ${c} ${def}`); };
-[['orders', 'phone', 'TEXT'], ['orders', 'ship', 'INTEGER DEFAULT 0'], ['orders', 'tracking', 'TEXT'], ['orders', 'courier', 'TEXT'], ['orders', 'eta', 'TEXT'], ['users', 'phone', 'TEXT'], ['users', 'address', 'TEXT']].forEach(x => addCol(...x));
-module.exports = db;
+require('dotenv').config();
+const mysql = require('mysql2/promise');
+
+const config = {
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '3306', 10),
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'sreekrishna_store',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  decimalNumbers: true
+};
+
+let pool = null;
+
+async function init() {
+  if (pool) return pool;
+
+  // 1. Connect without selecting database to ensure database exists
+  const tempConn = await mysql.createConnection({
+    host: config.host,
+    port: config.port,
+    user: config.user,
+    password: config.password
+  });
+  await tempConn.query(`CREATE DATABASE IF NOT EXISTS \`${config.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+  await tempConn.end();
+
+  // 2. Create the connection pool
+  pool = mysql.createPool(config);
+
+  // 3. Create tables and indexes
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(120) NOT NULL,
+      email VARCHAR(191) NOT NULL UNIQUE,
+      hash VARCHAR(255) NOT NULL,
+      role VARCHAR(32) NOT NULL DEFAULT 'customer',
+      phone VARCHAR(20) DEFAULT NULL,
+      address VARCHAR(500) DEFAULT NULL,
+      created VARCHAR(40)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS products (
+      id VARCHAR(32) PRIMARY KEY,
+      name VARCHAR(191),
+      cat VARCHAR(100),
+      sub VARCHAR(100),
+      price INT,
+      disc INT,
+      mrp INT,
+      cost INT,
+      col VARCHAR(60),
+      fab VARCHAR(100),
+      rating DOUBLE DEFAULT 0,
+      rev INT DEFAULT 0,
+      stock INT DEFAULT 0,
+      sku VARCHAR(64),
+      occ VARCHAR(60),
+      descr TEXT,
+      img LONGTEXT,
+      created VARCHAR(40),
+      sort_order INT AUTO_INCREMENT UNIQUE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS orders (
+      id VARCHAR(64) PRIMARY KEY,
+      user_id INT DEFAULT NULL,
+      email VARCHAR(191),
+      name VARCHAR(120),
+      address TEXT,
+      phone VARCHAR(20),
+      ship INT DEFAULT 0,
+      total INT,
+      cost INT,
+      pay VARCHAR(60),
+      status VARCHAR(60),
+      tracking VARCHAR(100) DEFAULT NULL,
+      courier VARCHAR(100) DEFAULT NULL,
+      eta VARCHAR(100) DEFAULT NULL,
+      created VARCHAR(40),
+      INDEX ix_orders_created (created),
+      INDEX ix_orders_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS order_items (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      order_id VARCHAR(64) NOT NULL,
+      product_id VARCHAR(32),
+      name VARCHAR(191),
+      col VARCHAR(60),
+      qty INT,
+      price INT,
+      cost INT,
+      INDEX ix_order_items_order (order_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS expenses (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      month VARCHAR(10),
+      kind VARCHAR(60),
+      amount INT,
+      INDEX ix_expenses_month (month)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS order_events (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      order_id VARCHAR(64) NOT NULL,
+      status VARCHAR(60),
+      note VARCHAR(255),
+      created VARCHAR(40),
+      INDEX ix_events_order (order_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS settings (
+      k VARCHAR(100) PRIMARY KEY,
+      v TEXT
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  return pool;
+}
+
+async function get(sql, params = []) {
+  if (!pool) await init();
+  const [rows] = await pool.query(sql, params);
+  return rows[0] || null;
+}
+
+async function all(sql, params = []) {
+  if (!pool) await init();
+  const [rows] = await pool.query(sql, params);
+  return rows;
+}
+
+async function run(sql, params = []) {
+  if (!pool) await init();
+  const [result] = await pool.query(sql, params);
+  return {
+    changes: result.affectedRows || 0,
+    lastInsertRowid: result.insertId || 0
+  };
+}
+
+async function transaction(callback) {
+  if (!pool) await init();
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const tx = {
+      async get(sql, params = []) {
+        const [rows] = await conn.query(sql, params);
+        return rows[0] || null;
+      },
+      async all(sql, params = []) {
+        const [rows] = await conn.query(sql, params);
+        return rows;
+      },
+      async run(sql, params = []) {
+        const [result] = await conn.query(sql, params);
+        return {
+          changes: result.affectedRows || 0,
+          lastInsertRowid: result.insertId || 0
+        };
+      },
+      query: conn.query.bind(conn)
+    };
+    const res = await callback(tx);
+    await conn.commit();
+    return res;
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+async function close() {
+  if (pool) {
+    await pool.end();
+    pool = null;
+  }
+}
+
+module.exports = {
+  init,
+  get,
+  all,
+  run,
+  transaction,
+  close,
+  query: async (...args) => {
+    if (!pool) await init();
+    return pool.query(...args);
+  },
+  get pool() {
+    return pool;
+  }
+};
