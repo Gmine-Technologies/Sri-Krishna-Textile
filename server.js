@@ -94,7 +94,7 @@ app.post('/api/auth/login', limit, wrap(async (q, s) => {
   const u = await db.get('SELECT * FROM users WHERE email=?', [email]);
   if (!u || !bcrypt.compareSync(String(q.body.password || ''), u.hash)) throw err(401, 'Invalid email or password');
   if (q.body.role === 'admin' && u.role !== 'admin') throw err(403, 'This is not an admin account');
-  if (q.body.role !== 'admin' && u.role === 'admin') throw err(403, 'Admin accounts must log in from the Admin tab');
+  if (q.body.role !== 'admin' && u.role === 'admin') throw err(403, 'Admin accounts must log in from /#/admin');
   s.json({ token: sign(u), user: pubU(u) });
 }));
 
@@ -118,7 +118,7 @@ app.post('/api/me/password', need, limit, wrap(async (q, s) => {
 }));
 
 // ---------- store settings ----------
-const CFG0 = { store: 'Sreekrishna Textiles', phone: '+91 90000 00000', email: 'care@sreekrishnatextiles.demo', addr: 'Chennai, Tamil Nadu, India', ship: 99, free: 2999, low: 8 };
+const CFG0 = { store: 'Sreekrishna Textiles', phone: '+91 9976392317', email: 'ramasamy.gokila@gmail.com', addr: 'No. 10 Shopping Mall 1st Floor, Kovai Road, Pollachi - 642002', ship: 99, free: 2999, low: 8 };
 const getCfg = async () => {
   const c = { ...CFG0 };
   const rows = await db.all('SELECT k,v FROM settings');
@@ -407,6 +407,8 @@ app.post('/api/admin/expenses', need, adm, wrap(async (q, s) => {
 
 app.use('/api', (q, s) => s.status(404).json({ error: 'Not found' }));
 app.use('/uploads', express.static(UP, { maxAge: '7d' }));
+app.get(['/admin', '/admin/*'], (q, s) => s.redirect('/#/admin'));
+app.get('/login', (q, s) => s.redirect('/#/login'));
 app.use(express.static(path.join(__dirname, 'public')));
 
 async function startServer() {
