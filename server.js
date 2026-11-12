@@ -3,7 +3,7 @@ const express = require('express'), path = require('path'), fs = require('fs'), 
 const db = require('./db');
 const seed = require('./seed');
 
-const PORT = process.env.PORT || 3000;
+let PORT = process.env.PORT || 3000;
 const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 if (!process.env.JWT_SECRET) console.warn('WARNING: JWT_SECRET not set, using an insecure development secret.');
 
@@ -14,7 +14,15 @@ const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '10mb' }));
 app.use((q, s, n) => {
-  s.set({ 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'SAMEORIGIN', 'Referrer-Policy': 'same-origin' });
+  s.set({
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'SAMEORIGIN',
+    'Referrer-Policy': 'same-origin'
+  });
+  if (q.method === 'OPTIONS') return s.sendStatus(204);
   n();
 });
 
@@ -64,7 +72,12 @@ const limit = (q, s, n) => {
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ---------- diagnostics & health ----------
-app.get('/api/health', (q, s) => s.json({ ok: dbConnected, dbConnected }));
+app.get('/api/health', (q, s) => s.json({
+  ok: dbConnected,
+  dbConnected,
+  store: 'Sreekrishna Textiles',
+  database: process.env.DB_NAME || 'sreekrishna_store'
+}));
 app.get('/api/db-status', (q, s) => {
   s.json({
     server: 'online',
@@ -187,7 +200,7 @@ app.post('/api/products', need, adm, wrap(async (q, s) => {
     'INSERT INTO products(id,name,cat,sub,price,disc,mrp,cost,col,fab,rating,rev,stock,sku,occ,descr,img,created) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
     [
       id, name.slice(0, 120), b.cat || 'Sarees', b.sub || b.cat || 'Silk', price, disc, mrpOf(price, disc),
-      Math.round(+b.cost) || Math.round(price * .6), b.col || 'Pink', b.fab || 'Silk', 4.5, 0,
+      ('cost' in b && +b.cost > 0) ? Math.round(+b.cost) : Math.max(1, Math.round(price * (1 - disc / 100))), b.col || 'Pink', b.fab || 'Silk', 4.5, 0,
       Math.max(0, Math.round(+b.stock) || 0), 'SKT-' + (7000 + n), b.occ || 'Festive',
       String(b.desc || 'New arrival from Sreekrishna Textiles.').slice(0, 500),
       b.img ? saveImg(id, b.img) : null, new Date().toISOString()
@@ -205,7 +218,10 @@ app.put('/api/products/:id', need, adm, wrap(async (q, s) => {
   for (const k of ['cat', 'col', 'fab', 'occ', 'sub']) if (k in b) n[k] = String(b[k]).slice(0, 60);
   if ('desc' in b) n.descr = String(b.desc).slice(0, 500);
   if ('price' in b) n.price = int(b.price, 1, 1e7);
-  if ('disc' in b) n.disc = int(b.disc, 0, 90);
+  if ('disc' in b) {
+    n.disc = int(b.disc, 0, 90);
+    if (!('cost' in b)) n.cost = Math.max(1, Math.round(n.price * (1 - n.disc / 100)));
+  }
   if ('cost' in b) n.cost = int(b.cost, 0, 1e7);
   if ('stock' in b) n.stock = int(b.stock, 0, 1e6);
   if ('price' in b || 'disc' in b) n.mrp = mrpOf(n.price, n.disc);
@@ -413,9 +429,23 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 async function startServer() {
   // 1. Start HTTP server immediately so Hostinger's proxy never receives a 503
-  const server = app.listen(PORT, () => {
-    console.log(`Sreekrishna Textiles running at http://localhost:${PORT}`);
+  const tryListen = (p) => new Promise((resolve, reject) => {
+    const srv = app.listen(p, () => {
+      PORT = p;
+      console.log(`Sreekrishna Textiles running at http://localhost:${p}`);
+      resolve(srv);
+    });
+    srv.on('error', (err) => {
+      if (err.code === 'EADDRINUSE' && p < 3010) {
+        console.warn(`Port ${p} in use, trying port ${p + 1}...`);
+        resolve(tryListen(p + 1));
+      } else {
+        reject(err);
+      }
+    });
   });
+
+  const server = await tryListen(PORT);
 
   // 2. Connect to MySQL database in background
   try {

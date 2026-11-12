@@ -16,36 +16,36 @@ const config = {
 let pool = null;
 
 async function init() {
-  if (pool) return pool;
-
-  // 1. Try to connect directly to the configured database (Hostinger / cloud / existing DB)
-  try {
-    const testPool = mysql.createPool(config);
-    const conn = await testPool.getConnection();
-    conn.release();
-    pool = testPool;
-  } catch (err) {
-    // If the database does not exist (ER_BAD_DB_ERROR), attempt to create it (for local dev / XAMPP)
-    if (err.code === 'ER_BAD_DB_ERROR') {
-      try {
-        const tempConn = await mysql.createConnection({
-          host: config.host,
-          port: config.port,
-          user: config.user,
-          password: config.password
-        });
-        await tempConn.query(`CREATE DATABASE IF NOT EXISTS \`${config.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
-        await tempConn.end();
-        pool = mysql.createPool(config);
-      } catch (createErr) {
-        throw new Error(
-          `Database '${config.database}' does not exist on MySQL server (${config.host}). ` +
-          `On Hostinger, please create the database inside Hostinger hPanel -> Databases -> MySQL Databases, ` +
-          `then update DB_NAME, DB_USER, and DB_PASSWORD to match your Hostinger database details.`
-        );
+  if (!pool) {
+    // 1. Try to connect directly to the configured database (Hostinger / cloud / existing DB)
+    try {
+      const testPool = mysql.createPool(config);
+      const conn = await testPool.getConnection();
+      conn.release();
+      pool = testPool;
+    } catch (err) {
+      // If the database does not exist (ER_BAD_DB_ERROR), attempt to create it (for local dev / XAMPP)
+      if (err.code === 'ER_BAD_DB_ERROR') {
+        try {
+          const tempConn = await mysql.createConnection({
+            host: config.host,
+            port: config.port,
+            user: config.user,
+            password: config.password
+          });
+          await tempConn.query(`CREATE DATABASE IF NOT EXISTS \`${config.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+          await tempConn.end();
+          pool = mysql.createPool(config);
+        } catch (createErr) {
+          throw new Error(
+            `Database '${config.database}' does not exist on MySQL server (${config.host}). ` +
+            `On Hostinger, please create the database inside Hostinger hPanel -> Databases -> MySQL Databases, ` +
+            `then update DB_NAME, DB_USER, and DB_PASSWORD to match your Hostinger database details.`
+          );
+        }
+      } else {
+        throw err;
       }
-    } else {
-      throw err;
     }
   }
 
