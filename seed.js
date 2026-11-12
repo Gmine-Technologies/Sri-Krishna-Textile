@@ -61,8 +61,7 @@ module.exports = async function seed(db) {
   add('Sarees', '', [], 30, 2800);
   add('Lehengas', 'Lehenga', ['Bridal Lehenga', 'Silk Lehenga', 'Designer Lehenga', 'Festive Lehenga'], 10, 8000, ['Silk', 'Net', 'Velvet']);
   add('Kurtis', 'Kurti', ['Cotton Kurti', 'Anarkali Kurti', 'Straight Kurti', 'Embroidered Kurti'], 10, 899, ['Cotton', 'Rayon']);
-  add('Suits & Dress Materials', 'Suit', ['Unstitched Suit', 'Dress Material', 'Salwar Set'], 10, 1599, ['Cotton', 'Chanderi']);
-  add('Home Decor', 'Decor', ['Silk Cushion Cover', 'Brass Diya Set', 'Table Runner', 'Curtain Pair', 'Bedsheet Set'], 10, 599, ['Silk', 'Brass', 'Cotton']);
+  add('Salwar/Chudi Materials', 'Salwar', ['Unstitched Salwar', 'Chudi Material', 'Salwar Set'], 10, 1599, ['Cotton', 'Chanderi']);
 
   const now = new Date().toISOString();
 
