@@ -12,7 +12,7 @@ fs.mkdirSync(UP, { recursive: true });
 
 const app = express();
 app.disable('x-powered-by');
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '16mb' }));
 app.use((q, s, n) => {
   s.set({
     'Access-Control-Allow-Origin': '*',
@@ -174,7 +174,7 @@ function saveImg(id, data) {
   const m = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(data || '');
   if (!m) throw err(400, 'Image must be a JPEG, PNG or WebP data URL');
   const buf = Buffer.from(m[2], 'base64');
-  if (buf.length > 3e6) throw err(413, 'Image too large (max 3 MB)');
+  if (buf.length > 12e6) throw err(413, 'Image too large (max 12 MB)');
   const f = `${id}-${Date.now()}.${m[1] === 'jpeg' ? 'jpg' : m[1]}`;
   fs.writeFileSync(path.join(UP, f), buf);
   return '/uploads/' + f;
