@@ -184,7 +184,7 @@ const rmImg = u => {
 };
 
 app.get('/api/products', wrap(async (q, s) => {
-  const rows = await db.all('SELECT * FROM products ORDER BY sort_order');
+  const rows = await db.all('SELECT * FROM products ORDER BY sort_order DESC');
   s.json(rows.map(r => mapP(r, isA(q))));
 }));
 
@@ -316,8 +316,9 @@ app.post('/api/orders', wrap(async (q, s) => {
       if (!p) throw err(404, 'A product in your cart no longer exists');
       const res = await tx.run('UPDATE products SET stock=stock-? WHERE id=? AND stock>=?', [qty, p.id, qty]);
       if (!res.changes) throw err(409, p.stock > 0 ? `Only ${p.stock} of "${p.name}" available` : `"${p.name}" is out of stock`);
-      sub += p.price * qty; cost += p.cost * qty;
-      lines.push({ p, qty, col: String(it.col || p.col) });
+      const eff = (p.cost && p.cost < p.price) ? p.cost : (p.disc ? Math.max(1, Math.round(p.price * (1 - p.disc / 100))) : p.price);
+      sub += eff * qty; cost += (p.cost || eff) * qty;
+      lines.push({ p, qty, col: String(it.col || p.col), eff });
     }
     const ship = sub < cfg.free ? cfg.ship : 0;
     const oid = 'SKT' + Date.now().toString().slice(-7) + Math.floor(Math.random() * 90 + 10);
@@ -328,7 +329,7 @@ app.post('/api/orders', wrap(async (q, s) => {
     for (const l of lines) {
       await tx.run(
         'INSERT INTO order_items(order_id,product_id,name,col,qty,price,cost) VALUES(?,?,?,?,?,?,?)',
-        [oid, l.p.id, l.p.name, l.col, l.qty, l.p.price, l.p.cost]
+        [oid, l.p.id, l.p.name, l.col, l.qty, l.eff || l.p.price, l.p.cost]
       );
     }
     await addEv(oid, 'Processing', 'Order placed', tx);
