@@ -7,8 +7,6 @@ let PORT = process.env.PORT || 3000;
 const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 if (!process.env.JWT_SECRET) console.warn('WARNING: JWT_SECRET not set, using an insecure development secret.');
 
-const UP = path.join(__dirname, 'data', 'uploads');
-fs.mkdirSync(UP, { recursive: true });
 
 const app = express();
 app.disable('x-powered-by');
@@ -170,17 +168,29 @@ const mapP = (r, a) => ({
 const isA = q => q.user && q.user.role === 'admin';
 const mrpOf = (p, d) => Math.round(p / (1 - d / 100) / 10) * 10;
 
-function saveImg(id, data) {
+async function saveImg(id, data) {
   const m = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(data || '');
   if (!m) throw err(400, 'Image must be a JPEG, PNG or WebP data URL');
   const buf = Buffer.from(m[2], 'base64');
   if (buf.length > 12e6) throw err(413, 'Image too large (max 12 MB)');
-  const f = `${id}-${Date.now()}.${m[1] === 'jpeg' ? 'jpg' : m[1]}`;
-  fs.writeFileSync(path.join(UP, f), buf);
+  const ext = m[1] === 'jpeg' ? 'jpg' : m[1];
+  const mime = `image/${m[1]}`;
+  const f = `${id}-${Date.now()}.${ext}`;
+
+  // Store ONLY in MySQL database
+  await db.run(
+    'INSERT INTO product_images(filename, product_id, mime, data) VALUES(?,?,?,?) ON DUPLICATE KEY UPDATE mime=VALUES(mime), data=VALUES(data)',
+    [f, id, mime, buf]
+  );
+
   return '/uploads/' + f;
 }
-const rmImg = u => {
-  if (u && u.startsWith('/uploads/')) fs.rm(path.join(UP, path.basename(u)), () => {});
+
+const rmImg = async u => {
+  if (u && u.startsWith('/uploads/')) {
+    const f = path.basename(u);
+    try { await db.run('DELETE FROM product_images WHERE filename=?', [f]); } catch (_) {}
+  }
 };
 
 app.get('/api/products', wrap(async (q, s) => {
@@ -203,7 +213,7 @@ app.post('/api/products', need, adm, wrap(async (q, s) => {
       ('cost' in b && +b.cost > 0) ? Math.round(+b.cost) : Math.max(1, Math.round(price * (1 - disc / 100))), b.col || 'Pink', b.fab || 'Silk', 4.5, 0,
       Math.max(0, Math.round(+b.stock) || 0), 'SKT-' + (7000 + n), b.occ || 'Festive',
       String(b.desc || 'New arrival from Sreekrishna Textiles.').slice(0, 500),
-      b.img ? saveImg(id, b.img) : null, new Date().toISOString()
+      b.img ? await saveImg(id, b.img) : null, new Date().toISOString()
     ]
   );
   const created = await db.get('SELECT * FROM products WHERE id=?', [id]);
@@ -226,8 +236,9 @@ app.put('/api/products/:id', need, adm, wrap(async (q, s) => {
   if ('stock' in b) n.stock = int(b.stock, 0, 1e6);
   if ('price' in b || 'disc' in b) n.mrp = mrpOf(n.price, n.disc);
   if ('img' in b) {
-    if (b.img === null) { rmImg(r.img); n.img = null; }
-    else if (/^data:/.test(b.img)) { n.img = saveImg(r.id, b.img); rmImg(r.img); }
+    if (b.img === null) { await rmImg(r.img); n.img = null; }
+    else if (/^data:/.test(b.img)) { n.img = await saveImg(r.id, b.img); await rmImg(r.img); }
+    else if (typeof b.img === 'string') { n.img = b.img; }
   }
 
   await db.run(
@@ -242,7 +253,7 @@ app.delete('/api/products/:id', need, adm, wrap(async (q, s) => {
   const r = await db.get('SELECT img FROM products WHERE id=?', [q.params.id]);
   if (!r) throw err(404, 'Product not found');
   await db.run('DELETE FROM products WHERE id=?', [q.params.id]);
-  rmImg(r.img);
+  await rmImg(r.img);
   s.json({ ok: true });
 }));
 
@@ -423,7 +434,46 @@ app.post('/api/admin/expenses', need, adm, wrap(async (q, s) => {
 }));
 
 app.use('/api', (q, s) => s.status(404).json({ error: 'Not found' }));
-app.use('/uploads', express.static(UP, { maxAge: '7d' }));
+// Images are stored ONLY in MySQL database and fetched ONLY from MySQL database
+app.get('/uploads/:filename', async (q, s) => {
+  const filename = path.basename(q.params.filename);
+  try {
+    const row = await db.get('SELECT mime, data FROM product_images WHERE filename=?', [filename]);
+    if (row && row.data) {
+      const buf = Buffer.isBuffer(row.data) ? row.data : Buffer.from(row.data);
+      s.set({
+        'Content-Type': row.mime || 'image/jpeg',
+        'Content-Length': buf.length,
+        'Cache-Control': 'public, max-age=86400',
+        'X-Content-Type-Options': 'nosniff'
+      });
+      return s.send(buf);
+    }
+  } catch (e) {
+    console.error('MySQL image fetch error:', e.message);
+  }
+  s.status(404).send('Image not found in database');
+});
+
+// Also provide direct product ID image endpoint from MySQL
+app.get('/api/products/:id/image', async (q, s) => {
+  try {
+    const row = await db.get('SELECT mime, data FROM product_images WHERE product_id=? ORDER BY created DESC LIMIT 1', [q.params.id]);
+    if (row && row.data) {
+      const buf = Buffer.isBuffer(row.data) ? row.data : Buffer.from(row.data);
+      s.set({
+        'Content-Type': row.mime || 'image/jpeg',
+        'Content-Length': buf.length,
+        'Cache-Control': 'public, max-age=86400',
+        'X-Content-Type-Options': 'nosniff'
+      });
+      return s.send(buf);
+    }
+  } catch (e) {
+    console.error('MySQL image fetch error:', e.message);
+  }
+  s.status(404).send('Image not found in database');
+});
 app.get(['/admin', '/admin/*'], (q, s) => s.redirect('/#/admin'));
 app.get('/login', (q, s) => s.redirect('/#/login'));
 app.use(express.static(path.join(__dirname, 'public')));
