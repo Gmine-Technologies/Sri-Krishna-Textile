@@ -7,8 +7,6 @@ let PORT = process.env.PORT || 3000;
 const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 if (!process.env.JWT_SECRET) console.warn('WARNING: JWT_SECRET not set, using an insecure development secret.');
 
-const UP = path.join(__dirname, 'data', 'uploads');
-fs.mkdirSync(UP, { recursive: true });
 
 const app = express();
 app.disable('x-powered-by');
@@ -179,22 +177,11 @@ async function saveImg(id, data) {
   const mime = `image/${m[1]}`;
   const f = `${id}-${Date.now()}.${ext}`;
 
-  // 1. Save permanently to MySQL database so it can NEVER be lost on git deploy or restart
-  try {
-    await db.run(
-      'INSERT INTO product_images(filename, product_id, mime, data) VALUES(?,?,?,?) ON DUPLICATE KEY UPDATE mime=VALUES(mime), data=VALUES(data)',
-      [f, id, mime, buf]
-    );
-  } catch (e) {
-    console.error('Failed to save image to MySQL product_images table:', e.message);
-  }
-
-  // 2. Write to local cache disk directory for ultra-fast static file serving
-  try {
-    fs.writeFileSync(path.join(UP, f), buf);
-  } catch (e) {
-    console.warn('Could not write image to local disk cache:', e.message);
-  }
+  // Store ONLY in MySQL database
+  await db.run(
+    'INSERT INTO product_images(filename, product_id, mime, data) VALUES(?,?,?,?) ON DUPLICATE KEY UPDATE mime=VALUES(mime), data=VALUES(data)',
+    [f, id, mime, buf]
+  );
 
   return '/uploads/' + f;
 }
@@ -202,7 +189,6 @@ async function saveImg(id, data) {
 const rmImg = async u => {
   if (u && u.startsWith('/uploads/')) {
     const f = path.basename(u);
-    try { fs.rm(path.join(UP, f), () => {}); } catch (_) {}
     try { await db.run('DELETE FROM product_images WHERE filename=?', [f]); } catch (_) {}
   }
 };
@@ -448,30 +434,45 @@ app.post('/api/admin/expenses', need, adm, wrap(async (q, s) => {
 }));
 
 app.use('/api', (q, s) => s.status(404).json({ error: 'Not found' }));
-app.use('/uploads', express.static(UP, { maxAge: '7d' }));
+// Images are stored ONLY in MySQL database and fetched ONLY from MySQL database
 app.get('/uploads/:filename', async (q, s) => {
   const filename = path.basename(q.params.filename);
-  const diskPath = path.join(UP, filename);
-
-  // 1. If file exists on disk cache, serve immediately
-  if (fs.existsSync(diskPath)) {
-    return s.sendFile(diskPath, { maxAge: '7d' });
-  }
-
-  // 2. Self-healing fallback: restore directly from MySQL database if disk was cleared on deploy/restart
   try {
     const row = await db.get('SELECT mime, data FROM product_images WHERE filename=?', [filename]);
     if (row && row.data) {
-      try { fs.writeFileSync(diskPath, row.data); } catch (_) {}
-      s.set('Content-Type', row.mime || 'image/jpeg');
-      s.set('Cache-Control', 'public, max-age=604800'); // 7 days
-      return s.send(row.data);
+      const buf = Buffer.isBuffer(row.data) ? row.data : Buffer.from(row.data);
+      s.set({
+        'Content-Type': row.mime || 'image/jpeg',
+        'Content-Length': buf.length,
+        'Cache-Control': 'public, max-age=86400',
+        'X-Content-Type-Options': 'nosniff'
+      });
+      return s.send(buf);
     }
   } catch (e) {
-    console.error('Error restoring image from database:', e.message);
+    console.error('MySQL image fetch error:', e.message);
   }
+  s.status(404).send('Image not found in database');
+});
 
-  s.status(404).send('Image not found');
+// Also provide direct product ID image endpoint from MySQL
+app.get('/api/products/:id/image', async (q, s) => {
+  try {
+    const row = await db.get('SELECT mime, data FROM product_images WHERE product_id=? ORDER BY created DESC LIMIT 1', [q.params.id]);
+    if (row && row.data) {
+      const buf = Buffer.isBuffer(row.data) ? row.data : Buffer.from(row.data);
+      s.set({
+        'Content-Type': row.mime || 'image/jpeg',
+        'Content-Length': buf.length,
+        'Cache-Control': 'public, max-age=86400',
+        'X-Content-Type-Options': 'nosniff'
+      });
+      return s.send(buf);
+    }
+  } catch (e) {
+    console.error('MySQL image fetch error:', e.message);
+  }
+  s.status(404).send('Image not found in database');
 });
 app.get(['/admin', '/admin/*'], (q, s) => s.redirect('/#/admin'));
 app.get('/login', (q, s) => s.redirect('/#/login'));
