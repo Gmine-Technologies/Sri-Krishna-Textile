@@ -88,6 +88,17 @@ async function init() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS product_images (
+      filename VARCHAR(191) PRIMARY KEY,
+      product_id VARCHAR(32),
+      mime VARCHAR(64) NOT NULL,
+      data LONGBLOB NOT NULL,
+      created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX ix_images_prod (product_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS orders (
       id VARCHAR(64) PRIMARY KEY,
       user_id INT DEFAULT NULL,

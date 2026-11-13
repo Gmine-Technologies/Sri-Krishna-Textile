@@ -170,17 +170,41 @@ const mapP = (r, a) => ({
 const isA = q => q.user && q.user.role === 'admin';
 const mrpOf = (p, d) => Math.round(p / (1 - d / 100) / 10) * 10;
 
-function saveImg(id, data) {
+async function saveImg(id, data) {
   const m = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(data || '');
   if (!m) throw err(400, 'Image must be a JPEG, PNG or WebP data URL');
   const buf = Buffer.from(m[2], 'base64');
   if (buf.length > 12e6) throw err(413, 'Image too large (max 12 MB)');
-  const f = `${id}-${Date.now()}.${m[1] === 'jpeg' ? 'jpg' : m[1]}`;
-  fs.writeFileSync(path.join(UP, f), buf);
+  const ext = m[1] === 'jpeg' ? 'jpg' : m[1];
+  const mime = `image/${m[1]}`;
+  const f = `${id}-${Date.now()}.${ext}`;
+
+  // 1. Save permanently to MySQL database so it can NEVER be lost on git deploy or restart
+  try {
+    await db.run(
+      'INSERT INTO product_images(filename, product_id, mime, data) VALUES(?,?,?,?) ON DUPLICATE KEY UPDATE mime=VALUES(mime), data=VALUES(data)',
+      [f, id, mime, buf]
+    );
+  } catch (e) {
+    console.error('Failed to save image to MySQL product_images table:', e.message);
+  }
+
+  // 2. Write to local cache disk directory for ultra-fast static file serving
+  try {
+    fs.writeFileSync(path.join(UP, f), buf);
+  } catch (e) {
+    console.warn('Could not write image to local disk cache:', e.message);
+  }
+
   return '/uploads/' + f;
 }
-const rmImg = u => {
-  if (u && u.startsWith('/uploads/')) fs.rm(path.join(UP, path.basename(u)), () => {});
+
+const rmImg = async u => {
+  if (u && u.startsWith('/uploads/')) {
+    const f = path.basename(u);
+    try { fs.rm(path.join(UP, f), () => {}); } catch (_) {}
+    try { await db.run('DELETE FROM product_images WHERE filename=?', [f]); } catch (_) {}
+  }
 };
 
 app.get('/api/products', wrap(async (q, s) => {
@@ -203,7 +227,7 @@ app.post('/api/products', need, adm, wrap(async (q, s) => {
       ('cost' in b && +b.cost > 0) ? Math.round(+b.cost) : Math.max(1, Math.round(price * (1 - disc / 100))), b.col || 'Pink', b.fab || 'Silk', 4.5, 0,
       Math.max(0, Math.round(+b.stock) || 0), 'SKT-' + (7000 + n), b.occ || 'Festive',
       String(b.desc || 'New arrival from Sreekrishna Textiles.').slice(0, 500),
-      b.img ? saveImg(id, b.img) : null, new Date().toISOString()
+      b.img ? await saveImg(id, b.img) : null, new Date().toISOString()
     ]
   );
   const created = await db.get('SELECT * FROM products WHERE id=?', [id]);
@@ -226,8 +250,9 @@ app.put('/api/products/:id', need, adm, wrap(async (q, s) => {
   if ('stock' in b) n.stock = int(b.stock, 0, 1e6);
   if ('price' in b || 'disc' in b) n.mrp = mrpOf(n.price, n.disc);
   if ('img' in b) {
-    if (b.img === null) { rmImg(r.img); n.img = null; }
-    else if (/^data:/.test(b.img)) { n.img = saveImg(r.id, b.img); rmImg(r.img); }
+    if (b.img === null) { await rmImg(r.img); n.img = null; }
+    else if (/^data:/.test(b.img)) { n.img = await saveImg(r.id, b.img); await rmImg(r.img); }
+    else if (typeof b.img === 'string') { n.img = b.img; }
   }
 
   await db.run(
@@ -242,7 +267,7 @@ app.delete('/api/products/:id', need, adm, wrap(async (q, s) => {
   const r = await db.get('SELECT img FROM products WHERE id=?', [q.params.id]);
   if (!r) throw err(404, 'Product not found');
   await db.run('DELETE FROM products WHERE id=?', [q.params.id]);
-  rmImg(r.img);
+  await rmImg(r.img);
   s.json({ ok: true });
 }));
 
@@ -424,6 +449,30 @@ app.post('/api/admin/expenses', need, adm, wrap(async (q, s) => {
 
 app.use('/api', (q, s) => s.status(404).json({ error: 'Not found' }));
 app.use('/uploads', express.static(UP, { maxAge: '7d' }));
+app.get('/uploads/:filename', async (q, s) => {
+  const filename = path.basename(q.params.filename);
+  const diskPath = path.join(UP, filename);
+
+  // 1. If file exists on disk cache, serve immediately
+  if (fs.existsSync(diskPath)) {
+    return s.sendFile(diskPath, { maxAge: '7d' });
+  }
+
+  // 2. Self-healing fallback: restore directly from MySQL database if disk was cleared on deploy/restart
+  try {
+    const row = await db.get('SELECT mime, data FROM product_images WHERE filename=?', [filename]);
+    if (row && row.data) {
+      try { fs.writeFileSync(diskPath, row.data); } catch (_) {}
+      s.set('Content-Type', row.mime || 'image/jpeg');
+      s.set('Cache-Control', 'public, max-age=604800'); // 7 days
+      return s.send(row.data);
+    }
+  } catch (e) {
+    console.error('Error restoring image from database:', e.message);
+  }
+
+  s.status(404).send('Image not found');
+});
 app.get(['/admin', '/admin/*'], (q, s) => s.redirect('/#/admin'));
 app.get('/login', (q, s) => s.redirect('/#/login'));
 app.use(express.static(path.join(__dirname, 'public')));
