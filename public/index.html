@@ -470,6 +470,7 @@ function aProd(){
       ${allCats.map(c => `<option value="${c.replace(/"/g,'&quot;')}" ${(admCat||'').toLowerCase()===c.toLowerCase()?'selected':''}>${c} (${P.filter(p=>(p.cat||'').toLowerCase()===c.toLowerCase()).length})</option>`).join('')}
     </select>
     <button type="button" class="btn" onclick="addProd()">+ Add product</button>
+    <button type="button" class="btn o" style="border-color:#0a7a4b;color:#0a7a4b;font-weight:600" onclick="downloadAllProdImgs()" title="Download original uncompressed images for all currently listed products">📥 Download All Images</button>
     ${API?'':`<button type="button" class="btn o" onclick="if(confirm('Reset all product edits and orders?')){['ov','addp','delp','orders'].forEach(k=>ST(k,null));location.reload()}">Reset demo data</button>`}
     <small style="opacity:.85">${list.length} of ${P.length} products ${admCat ? `in <b>${admCat}</b>` : ''}</small>
   </div>
@@ -495,6 +496,7 @@ function aProd(){
         ${list.map(p=>`<tr>
           <td style="width:56px">
             <div style="width:48px;height:60px;border-radius:6px;overflow:hidden">${art(p,'front')}</div>
+            ${p.img ? `<button type="button" onclick="downloadProdImg('${p.id}')" title="Download image at original quality" style="margin-top:3px;display:block;width:100%;font-size:10px;padding:2px 0;background:#eaf8f0;border:1px solid #70c496;border-radius:4px;color:#0a7a4b;cursor:pointer;text-align:center;font-weight:600">📥 Save</button>` : ''}
           </td>
           <td>
             <input aria-label="Name of ${p.sku}" value="${(p.name||'').replace(/"/g,'&quot;')}" style="width:200px" onchange="svP('${p.id}',{name:this.value});toast('Saved ✓')">
@@ -505,8 +507,9 @@ function aProd(){
           ${[['price',p.price],['disc',p.disc],['cost',p.cost||Math.max(1,Math.round(p.price*(1-(p.disc||0)/100)))],['stock',p.stock]].map(([k,v])=>`<td><input type="number" min="0" data-k="${k}" aria-label="${k} of ${p.sku}" value="${v}" style="width:${k=='disc'?58:78}px" onchange="admNum('${p.id}','${k}',this)" oninput="if('${k}'==='disc'||'${k}'==='price')admCalc('${p.id}',this)"></td>`).join('')}
           <td>
             <input type="file" accept="image/*" aria-label="Upload picture for ${p.sku}" onchange="admImg('${p.id}',this)" style="width:140px">
-            <div style="margin-top:4px;display:flex;gap:6px">
+            <div style="margin-top:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
               <button type="button" onclick="promptImgUrl('${p.id}')" style="background:none;color:#5a0f2a;font-size:11px;text-decoration:underline;cursor:pointer">Enter URL</button>
+              ${p.img?`<button type="button" onclick="downloadProdImg('${p.id}')" title="Download original uncompressed image" style="background:#eaf8f0;border:1px solid #70c496;color:#0a7a4b;border-radius:4px;padding:2px 6px;font-size:11px;font-weight:600;cursor:pointer">📥 Download</button>`:''}
               ${p.img?`<button type="button" onclick="svP('${p.id}',{img:null});route()" style="background:none;color:#b3122a;font-size:11px;cursor:pointer">Remove</button>`:''}
             </div>
           </td>
@@ -518,6 +521,87 @@ function aProd(){
       </tbody>
     </table>
   </div>`;
+}
+
+async function downloadProdImg(id){
+  const p = (typeof find === 'function') ? find(id) : null;
+  if(!p) return toast('Product not found');
+  if(!p.img) return toast('No custom image uploaded for this product yet');
+
+  const extFromMime = mime => (mime && mime.includes('png')) ? 'png' : (mime && mime.includes('webp')) ? 'webp' : 'jpg';
+  const safeName = `${p.sku || p.id}_${(p.name || 'product').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50)}`;
+
+  try {
+    toast('Preparing 100% original quality download...');
+
+    // 1. If base64 data URL: convert to Blob losslessly without canvas (zero quality loss)
+    if(p.img.startsWith('data:')){
+      const parts = p.img.split(',');
+      const mime = (parts[0].match(/:(.*?);/) || [])[1] || 'image/jpeg';
+      const ext = extFromMime(mime);
+      const byteChars = atob(parts[1]);
+      const byteNumbers = new Array(byteChars.length);
+      for(let i = 0; i < byteChars.length; i++){
+        byteNumbers[i] = byteChars.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: mime });
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `${safeName}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { a.remove(); URL.revokeObjectURL(blobUrl); }, 1500);
+      toast('Downloaded at 100% original quality ✓');
+      return;
+    }
+
+    // 2. If server or external URL: fetch raw binary stream
+    const url = (p.img.startsWith('/uploads') && window.API_BASE) ? window.API_BASE + p.img : p.img;
+    const downloadEndpoint = (typeof API !== 'undefined' && API && p.img.startsWith('/uploads'))
+      ? `/api/products/${encodeURIComponent(p.id)}/image/download`
+      : url;
+
+    const res = await fetch(downloadEndpoint);
+    if(!res.ok) throw new Error('Fetch failed: ' + res.status);
+    const blob = await res.blob();
+    const ext = extFromMime(blob.type);
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = `${safeName}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { a.remove(); URL.revokeObjectURL(blobUrl); }, 1500);
+    toast('Downloaded at 100% original quality ✓');
+  }catch(err){
+    console.warn('Direct blob download fallback:', err);
+    const a = document.createElement('a');
+    a.href = p.img;
+    a.target = '_blank';
+    a.download = `${safeName}.jpg`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => a.remove(), 1000);
+    toast('Image download initiated ✓');
+  }
+}
+
+async function downloadAllProdImgs(){
+  const q = pq.toLowerCase();
+  const list = P.filter(p => (!admCat || (p.cat || '').toLowerCase() == admCat.toLowerCase()) && (!q || (p.name + (p.cat || '') + (p.sku || '')).toLowerCase().includes(q)));
+  const withImg = list.filter(p => p.img);
+  if(!withImg.length) return toast('No products in the current list have custom images to download');
+
+  if(!confirm(`Download original uncompressed images for ${withImg.length} product(s)?`)) return;
+
+  toast(`Starting download for ${withImg.length} images...`);
+  for(let i = 0; i < withImg.length; i++){
+    await downloadProdImg(withImg[i].id);
+    await new Promise(r => setTimeout(r, 400));
+  }
+  toast(`All ${withImg.length} product images downloaded ✓`);
 }
 function promptImgUrl(id){
   const p=find(id);if(!p)return;
@@ -593,6 +677,7 @@ function editProdModal(id){
         <input type="file" id="ep_file" accept="image/*" style="flex:1">
         <input id="ep_imgurl" placeholder="Or paste image URL" value="${(p.img||'').startsWith('data:')?'':(p.img||'')}" style="flex:1">
       </div>
+      ${p.img ? `<div style="margin-top:8px"><button type="button" class="btn o" style="font-size:11px;padding:4px 10px;color:#0a7a4b;border-color:#70c496;background:#eaf8f0;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px" onclick="downloadProdImg('${p.id}')">📥 Download Current Image (Original Uncompressed Quality)</button></div>` : ''}
     </div>
     <div style="margin-top:16px;display:flex;gap:10px">
       <button type="button" class="btn" id="ep_save">Save Changes</button>
