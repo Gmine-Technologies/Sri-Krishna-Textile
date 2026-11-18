@@ -433,7 +433,62 @@ app.post('/api/admin/expenses', need, adm, wrap(async (q, s) => {
   s.status(201).json({ ok: true });
 }));
 
+// Also provide direct product ID image endpoint from MySQL
+app.get('/api/products/:id/image', async (q, s) => {
+  try {
+    let row = await db.get('SELECT mime, data FROM product_images WHERE product_id=? ORDER BY created DESC LIMIT 1', [q.params.id]);
+    if (!row) {
+      const p = await db.get('SELECT img FROM products WHERE id=?', [q.params.id]);
+      if (p && p.img && p.img.startsWith('/uploads/')) {
+        row = await db.get('SELECT mime, data FROM product_images WHERE filename=?', [path.basename(p.img)]);
+      }
+    }
+    if (row && row.data) {
+      const buf = Buffer.isBuffer(row.data) ? row.data : Buffer.from(row.data);
+      s.set({
+        'Content-Type': row.mime || 'image/jpeg',
+        'Content-Length': buf.length,
+        'Cache-Control': 'public, max-age=86400',
+        'X-Content-Type-Options': 'nosniff'
+      });
+      return s.send(buf);
+    }
+  } catch (e) {
+    console.error('MySQL image fetch error:', e.message);
+  }
+  s.status(404).send('Image not found in database');
+});
+
+// Direct lossless image download endpoint with attachment header for 100% original quality
+app.get('/api/products/:id/image/download', async (q, s) => {
+  try {
+    let row = await db.get('SELECT filename, mime, data FROM product_images WHERE product_id=? ORDER BY created DESC LIMIT 1', [q.params.id]);
+    const p = await db.get('SELECT name, sku, img FROM products WHERE id=?', [q.params.id]);
+    if (!row && p && p.img && p.img.startsWith('/uploads/')) {
+      const fn = path.basename(p.img);
+      row = await db.get('SELECT filename, mime, data FROM product_images WHERE filename=?', [fn]);
+    }
+    if (row && row.data) {
+      const buf = Buffer.isBuffer(row.data) ? row.data : Buffer.from(row.data);
+      const ext = (row.mime && row.mime.includes('png')) ? 'png' : (row.mime && row.mime.includes('webp')) ? 'webp' : 'jpg';
+      const safeName = p ? `${p.sku || q.params.id}_${(p.name || '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50)}.${ext}` : `${q.params.id}.${ext}`;
+      s.set({
+        'Content-Type': row.mime || 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${safeName}"`,
+        'Content-Length': buf.length,
+        'Cache-Control': 'no-cache',
+        'X-Content-Type-Options': 'nosniff'
+      });
+      return s.send(buf);
+    }
+  } catch (e) {
+    console.error('MySQL image download error:', e.message);
+  }
+  s.status(404).send('Image not found in database');
+});
+
 app.use('/api', (q, s) => s.status(404).json({ error: 'Not found' }));
+
 // Images are stored ONLY in MySQL database and fetched ONLY from MySQL database
 app.get('/uploads/:filename', async (q, s) => {
   const filename = path.basename(q.params.filename);
@@ -455,22 +510,24 @@ app.get('/uploads/:filename', async (q, s) => {
   s.status(404).send('Image not found in database');
 });
 
-// Also provide direct product ID image endpoint from MySQL
-app.get('/api/products/:id/image', async (q, s) => {
+// Lossless download of uploaded files directly by filename
+app.get('/uploads/:filename/download', async (q, s) => {
+  const filename = path.basename(q.params.filename);
   try {
-    const row = await db.get('SELECT mime, data FROM product_images WHERE product_id=? ORDER BY created DESC LIMIT 1', [q.params.id]);
+    const row = await db.get('SELECT mime, data FROM product_images WHERE filename=?', [filename]);
     if (row && row.data) {
       const buf = Buffer.isBuffer(row.data) ? row.data : Buffer.from(row.data);
       s.set({
-        'Content-Type': row.mime || 'image/jpeg',
+        'Content-Type': row.mime || 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${filename}"`,
         'Content-Length': buf.length,
-        'Cache-Control': 'public, max-age=86400',
+        'Cache-Control': 'no-cache',
         'X-Content-Type-Options': 'nosniff'
       });
       return s.send(buf);
     }
   } catch (e) {
-    console.error('MySQL image fetch error:', e.message);
+    console.error('MySQL image download error:', e.message);
   }
   s.status(404).send('Image not found in database');
 });
