@@ -255,7 +255,7 @@ Whether you visit our welcoming showroom in Pollachi or shop online with our AI 
 <br>• Provide dedicated customer service and support for inquiries, exchanges, or returns.
 <br>• Prevent fraudulent transactions and ensure secure account access.</p>
 <h4 style="margin:16px 0 8px">3. Payment Information &amp; Security</h4>
-<p style="margin-bottom:12px">All online payments (UPI, Credit/Debit Cards, Net Banking) are processed through encrypted, industry-standard payment gateways. Sreekrishna Textiles does not store or have access to your bank passwords, OTPs, or CVV numbers.</p>
+<p style="margin-bottom:12px">All online payments (UPI, Cash on Delivery) are processed through encrypted, industry-standard systems. Sreekrishna Textiles does not store or have access to your bank passwords or OTPs.</p>
 <h4 style="margin:16px 0 8px">4. Data Sharing &amp; Protection</h4>
 <p style="margin-bottom:12px">We never sell, rent, or trade your personal information. We share delivery details solely with certified courier and logistics partners (such as Delhivery or India Post) strictly for delivering your parcel.</p>
 <h4 style="margin:16px 0 8px">5. Contact Our Privacy Team</h4>
@@ -436,6 +436,7 @@ function downloadUPIQR(amount){
 
 let ck={step:0,pay:'UPI',pay_ref:'',pay_verified:false,pay_verified_ref:'',delivery:'standard',addr:{}};
 function checkout(){
+  if(!['UPI','Cash on Delivery'].includes(ck.pay))ck.pay='UPI';
   const S=['Account','Address','Delivery','Payment','Review','Done'];
   const t=tt();
   const actItems=cart.filter(i=>!i.later);
@@ -511,7 +512,7 @@ function checkout(){
   const body3 = `
     <div style="display:grid;gap:14px">
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        ${['UPI','Cash on Delivery','Net Banking','Credit / Debit Card'].map(m=>`
+        ${['UPI','Cash on Delivery'].map(m=>`
           <button type="button" class="btn ${ck.pay==m?'':'o'}" style="padding:8px 16px;font-size:13px;border-radius:20px" onclick="ck.pay='${m}';route()">${m==='UPI'?'⚡ UPI / QR Code':m}</button>
         `).join('')}
       </div>
@@ -585,16 +586,11 @@ function checkout(){
             </div>
           </div>
         </div>
-      ` : ck.pay === 'Cash on Delivery' ? `
+      ` : `
         <div style="background:#fff;border:1.5px solid #ecd3a0;border-radius:12px;padding:18px">
           <h4 style="margin:0 0 6px;color:#5a0f2a;font-size:16px">Cash on Delivery (COD)</h4>
           <p style="font-size:13px;color:#555;margin:0 0 8px">Pay in cash when your parcel is delivered to your doorstep.</p>
           <small style="color:#888">Our courier will contact you on your registered phone before delivery.</small>
-        </div>
-      ` : `
-        <div style="background:#fff;border:1.5px solid #ecd3a0;border-radius:12px;padding:18px">
-          <h4 style="margin:0 0 6px;color:#5a0f2a;font-size:16px">${ck.pay}</h4>
-          <p style="font-size:13px;color:#555;margin:0">Secure online payment will be confirmed upon order placement.</p>
         </div>
       `}
     </div>

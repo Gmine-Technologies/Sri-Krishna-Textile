@@ -354,7 +354,7 @@ app.post('/api/verify-upi', wrap(async (q, s) => {
 app.post('/api/orders', wrap(async (q, s) => {
   const items = Array.isArray(q.body.items) ? q.body.items : [];
   if (!items.length || items.length > 50) throw err(400, 'Cart is empty');
-  const pay = ['UPI', 'Credit Card', 'Debit Card', 'Net Banking', 'Cash on Delivery'].includes(q.body.pay) ? q.body.pay : 'UPI';
+  const pay = ['UPI', 'Cash on Delivery'].includes(q.body.pay) ? q.body.pay : 'UPI';
   const pay_ref = String(q.body.pay_ref || '').trim().slice(0, 100);
   if (pay === 'UPI') {
     const cleanRef = pay_ref.replace(/\D/g, '');
