@@ -49,11 +49,23 @@ async function sendMail({ to, subject, html, text }) {
 }
 
 async function sendOtpEmail({ to, otp, purpose = 'forgot_password', name = '' }) {
-  const isForgot = purpose === 'forgot_password';
-  const title = isForgot ? 'Password Reset Verification Code' : 'Your Login Verification Code';
-  const actionText = isForgot
-    ? 'You requested to reset your password for your Sreekrishna Textiles account.'
-    : 'Use the 6-digit verification code below to log in to your Sreekrishna Textiles account.';
+  let title = 'Your Verification Code';
+  let actionText = 'Use the 6-digit verification code below to verify your account.';
+  let subject = `[Sreekrishna Textiles] ${otp} is your verification code`;
+
+  if (purpose === 'signup') {
+    title = 'Verify Your Email Address';
+    actionText = 'Welcome to Sreekrishna Textiles! Use the 6-digit verification code below to verify your email and complete your account registration:';
+    subject = `[Sreekrishna Textiles] ${otp} is your account verification code`;
+  } else if (purpose === 'forgot_password') {
+    title = 'Password Reset Verification Code';
+    actionText = 'You requested to reset your password for your Sreekrishna Textiles account.';
+    subject = `[Sreekrishna Textiles] ${otp} is your password reset code`;
+  } else if (purpose === 'login') {
+    title = 'Your Login Verification Code';
+    actionText = 'Use the 6-digit verification code below to log in to your Sreekrishna Textiles account without a password.';
+    subject = `[Sreekrishna Textiles] ${otp} is your login code`;
+  }
 
   const html = `
     <!DOCTYPE html>
@@ -91,7 +103,7 @@ async function sendOtpEmail({ to, otp, purpose = 'forgot_password', name = '' })
 
   return await sendMail({
     to,
-    subject: `[Sreekrishna Textiles] ${otp} is your ${isForgot ? 'password reset' : 'login'} code`,
+    subject,
     html,
   });
 }

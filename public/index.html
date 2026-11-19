@@ -862,6 +862,82 @@ function renderRingSarees(){
 }
 let otpLoginActive = false, otpLoginStep = 1, otpLoginEmail = '', otpTimer = 0, otpInterval = null;
 let fpState = { step: 1, email: '', resetToken: '', timer: 0, interval: null, devOtp: '' };
+let regState = { step: 1, name: '', email: '', password: '', timer: 0, interval: null };
+
+function startRegTimer(){
+  regState.timer = 60;
+  if (regState.interval) clearInterval(regState.interval);
+  regState.interval = setInterval(() => {
+    regState.timer--;
+    const el = $('#reg_cd');
+    if (el) el.textContent = regState.timer;
+    if (regState.timer <= 0) {
+      clearInterval(regState.interval);
+      const tbox = $('#reg_timer_box');
+      if (tbox) tbox.innerHTML = '<a href="javascript:void(0)" onclick="doRegSendOtp(true)" style="color:var(--mag);font-weight:600">Resend Code</a>';
+    }
+  }, 1000);
+}
+
+async function doRegSendOtp(isResend){
+  const name = isResend ? regState.name : ($('#n') ? $('#n').value.trim() : '');
+  const email = (isResend ? regState.email : ($('#e') ? $('#e').value.trim() : '')).toLowerCase();
+  const pw = isResend ? regState.password : ($('#pw') ? $('#pw').value : '');
+
+  if (!name) return toast('Please enter your full name');
+  if (!email || !email.includes('@')) return toast('Please enter a valid email address');
+  if (pw.length < 6) return toast('Password must be at least 6 characters');
+
+  regState.name = name;
+  regState.email = email;
+  regState.password = pw;
+
+  const btn = $('#reg_btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending verification code...'; }
+
+  try {
+    const r = await api('POST', '/auth/register/send-otp', { name, email, password: pw });
+    regState.step = 2;
+    startRegTimer();
+    toast(r.message || 'Verification code sent to ' + email);
+    route();
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Verify Email & Create Account'; }
+    toast(err.message || 'Failed to send verification code');
+  }
+}
+
+async function doRegComplete(){
+  const inp = $('#reg_otp');
+  if (!inp) return;
+  const otp = inp.value.trim();
+  if (!/^\d{6}$/.test(otp)) return toast('Please enter the 6-digit verification code');
+
+  const btn = $('#reg_complete_btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Verifying...'; }
+
+  try {
+    const r = await api('POST', '/auth/register', {
+      name: regState.name,
+      email: regState.email,
+      password: regState.password,
+      otp
+    });
+    TOK = r.token; ST('tok', TOK);
+    user = r.user; ST('user', user);
+    regState = { step: 1, name: '', email: '', password: '', timer: 0, interval: null };
+    await loadProducts(); await loadOrders(); counts();
+    toast('Account verified & created! Welcome, ' + user.name + '!');
+    if (location.hash === '#/' || location.hash === '' || location.hash === '#') {
+      location.hash = '#/'; route();
+    } else {
+      location.hash = '#/';
+    }
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Verify & Complete Registration'; }
+    toast(err.message || 'Verification failed');
+  }
+}
 
 function toggleOtpLogin(val){
   otpLoginActive = (typeof val === 'boolean') ? val : !otpLoginActive;
@@ -1103,20 +1179,47 @@ ${(() => {
       `}
     </div>`;
   }
+  if (reg) {
+    if (regState.step === 2) {
+      return `<div class="panel authp">
+        <h2>Verify Your Email</h2>
+        <div style="background:#fdf8f4;border:1px solid #ebd8ca;border-radius:10px;padding:12px 14px;margin-bottom:18px;font-size:13px;color:#5a0f2a;line-height:1.5">
+          ✉ We sent a 6-digit verification code to <b>${esc(regState.email)}</b>.<br>
+          <small style="color:#777">Check your inbox or spam folder. Code is valid for 10 minutes.</small>
+        </div>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;color:#444">6-Digit Verification Code</label>
+        <input id="reg_otp" type="text" maxlength="6" inputmode="numeric" placeholder="• • • • • •" style="font-size:24px;letter-spacing:10px;text-align:center;font-weight:700;color:#5a0f2a" onkeydown="if(event.key==='Enter')doRegComplete()">
+        <div id="reg_timer_box" style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#777;margin:8px 0 16px">
+          <span>Resend code in <b id="reg_cd">${regState.timer || 60}</b>s</span>
+          <a href="javascript:void(0)" onclick="regState.step=1;route()" style="color:#888;text-decoration:underline">← Change details</a>
+        </div>
+        <button class="btn" id="reg_complete_btn" style="width:100%" onclick="doRegComplete()">Verify & Complete Registration</button>
+        <p style="margin-top:14px;text-align:center">
+          <a href="#/login" style="color:var(--mag);font-size:12.5px" onclick="regState.step=1">Already have an account? Login</a>
+        </p>
+      </div>`;
+    }
+    return `<div class="panel authp">
+      <h2>Create customer account</h2>
+      <p class="sub">Enter your details to create an account. A 6-digit verification code will be sent to your email.</p>
+      <input id="n" aria-label="Name" placeholder="Full Name" value="${esc(regState.name||'')}">
+      <input id="e" type="email" aria-label="Email" placeholder="Email address" value="${esc(regState.email||'')}">
+      <input id="pw" type="password" aria-label="Password" placeholder="Create password (min 6 characters)" value="${esc(regState.password||'')}" onkeydown="if(event.key==='Enter')doRegSendOtp()">
+      <button class="btn" id="reg_btn" onclick="doRegSendOtp()">Verify Email & Create Account</button>
+      <p style="margin-top:12px"><a href="#/login" style="color:var(--mag)" onclick="regState.step=1">Already have an account? Login</a></p>
+    </div>`;
+  }
   return `<div class="panel authp">
-    <h2>${reg?'Create customer account':'Login'}</h2>
-    ${reg?'<input id="n" aria-label="Name" placeholder="Name">':''}
+    <h2>Login</h2>
     <input id="e" type="email" aria-label="Email" placeholder="Email">
-    <input id="pw" type="password" aria-label="Password" placeholder="Password" onkeydown="if(event.key==='Enter')doAuth(${reg})">
-    ${!reg ? `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 12px;font-size:12.5px">
-        <a href="#/forgot" style="color:var(--mag);text-decoration:underline">Forgot password?</a>
-        <a href="javascript:void(0)" onclick="toggleOtpLogin(true)" style="color:#8a4d2e;font-weight:600">⚡ Login with OTP</a>
-      </div>
-    ` : ''}
-    ${!reg?'<p class="sub">Customers: log in, or register a new account.</p>':''}
-    <button class="btn" onclick="doAuth(${reg})">${reg?'Create account':'Login'}</button>
-    <p style="margin-top:12px"><a href="#/${reg?'login':'register'}" style="color:var(--mag)">${reg?'Have an account? Login':'New customer? Register'}</a></p>
+    <input id="pw" type="password" aria-label="Password" placeholder="Password" onkeydown="if(event.key==='Enter')doAuth(false)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 12px;font-size:12.5px">
+      <a href="#/forgot" style="color:var(--mag);text-decoration:underline">Forgot password?</a>
+      <a href="javascript:void(0)" onclick="toggleOtpLogin(true)" style="color:#8a4d2e;font-weight:600">⚡ Login with OTP</a>
+    </div>
+    <p class="sub">Customers: log in, or register a new account.</p>
+    <button class="btn" onclick="doAuth(false)">Login</button>
+    <p style="margin-top:12px"><a href="#/register" style="color:var(--mag)" onclick="regState.step=1">New customer? Register</a></p>
   </div>`;
 })()}</div>`}
 function doAuth(reg){const e=$('#e').value.trim(),pw=$('#pw').value;if(!e)return toast('Enter email');if(!pw)return toast('Enter password');

@@ -93,11 +93,70 @@ app.get('/api/db-status', (q, s) => {
   });
 });
 
+// Send verification OTP during customer registration (Sign Up)
+app.post('/api/auth/register/send-otp', limit, wrap(async (q, s) => {
+  const name = String(q.body.name || '').trim().slice(0, 80);
+  const email = String(q.body.email || '').trim().toLowerCase();
+  const pw = String(q.body.password || '');
+
+  if (!name) throw err(400, 'Please enter your name');
+  if (!EMAIL.test(email)) throw err(400, 'Please enter a valid email address');
+  if (pw.length < 6) throw err(400, 'Password must be at least 6 characters');
+
+  if (await db.get('SELECT 1 FROM users WHERE email=?', [email])) {
+    throw err(409, 'An account with this email already exists. Please log in.');
+  }
+
+  const recent = await db.all('SELECT id FROM email_otps WHERE email=? AND purpose=? AND created_at > ?', [email, 'signup', Date.now() - 6e5]);
+  if (recent.length >= 4) throw err(429, 'Too many verification requests. Please wait a few minutes before trying again.');
+
+  const otp = String(crypto.randomInt(100000, 999999));
+  const now = Date.now();
+  const expiresAt = now + 10 * 60 * 1000;
+
+  await db.run('DELETE FROM email_otps WHERE email=? AND purpose=?', [email, 'signup']);
+  await db.run('INSERT INTO email_otps(email, otp, purpose, expires_at, created_at) VALUES(?,?,?,?,?)', [email, otp, 'signup', expiresAt, now]);
+
+  const mailRes = await mailer.sendOtpEmail({ to: email, otp, purpose: 'signup', name });
+
+  s.json({
+    ok: true,
+    message: `A 6-digit verification code has been sent to ${email}`,
+    devOtp: mailRes && mailRes.simulated ? otp : undefined,
+    configured: mailer.isConfigured()
+  });
+}));
+
 app.post('/api/auth/register', limit, wrap(async (q, s) => {
-  const name = String(q.body.name || '').trim().slice(0, 80), email = String(q.body.email || '').trim().toLowerCase(), pw = String(q.body.password || '');
+  const name = String(q.body.name || '').trim().slice(0, 80);
+  const email = String(q.body.email || '').trim().toLowerCase();
+  const pw = String(q.body.password || '');
+  const otp = String(q.body.otp || '').trim();
+
   if (!name || !EMAIL.test(email)) throw err(400, 'Enter a valid name and email');
   if (pw.length < 6) throw err(400, 'Password must be at least 6 characters');
   if (await db.get('SELECT 1 FROM users WHERE email=?', [email])) throw err(409, 'An account with this email already exists');
+
+  if (!/^\d{6}$/.test(otp)) throw err(400, 'Please enter the 6-digit verification code sent to your email');
+
+  const rec = await db.get('SELECT * FROM email_otps WHERE email=? AND purpose=? ORDER BY id DESC LIMIT 1', [email, 'signup']);
+  if (!rec || Date.now() > rec.expires_at) {
+    throw err(400, 'Verification code has expired. Please request a new code.');
+  }
+
+  if (rec.attempts >= 5) {
+    await db.run('DELETE FROM email_otps WHERE id=?', [rec.id]);
+    throw err(400, 'Too many incorrect attempts. Please request a new verification code.');
+  }
+
+  if (rec.otp !== otp) {
+    await db.run('UPDATE email_otps SET attempts = attempts + 1 WHERE id=?', [rec.id]);
+    const rem = 5 - (rec.attempts + 1);
+    throw err(400, `Invalid verification code. ${rem} attempt(s) remaining.`);
+  }
+
+  await db.run('DELETE FROM email_otps WHERE id=?', [rec.id]);
+
   const res = await db.run('INSERT INTO users(name,email,hash,role,created) VALUES(?,?,?,?,?)', [name, email, bcrypt.hashSync(pw, 10), 'customer', new Date().toISOString()]);
   const u = await db.get('SELECT * FROM users WHERE id=?', [res.lastInsertRowid]);
   s.status(201).json({ token: sign(u), user: pubU(u) });
