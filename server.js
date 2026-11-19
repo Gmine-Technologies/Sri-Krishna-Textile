@@ -3,6 +3,8 @@ const express = require('express'), path = require('path'), fs = require('fs'), 
 const QRCode = require('qrcode');
 const db = require('./db');
 const seed = require('./seed');
+const crypto = require('crypto');
+const mailer = require('./mailer');
 
 let PORT = process.env.PORT || 3000;
 const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
@@ -108,6 +110,164 @@ app.post('/api/auth/login', limit, wrap(async (q, s) => {
   if (q.body.role === 'admin' && u.role !== 'admin') throw err(403, 'This is not an admin account');
   if (q.body.role !== 'admin' && u.role === 'admin') throw err(403, 'Admin accounts must log in from /#/admin');
   s.json({ token: sign(u), user: pubU(u) });
+}));
+
+// ---------- SMTP & Email OTP Endpoints ----------
+app.get('/api/auth/smtp-status', (q, s) => {
+  s.json({
+    configured: mailer.isConfigured(),
+    sender: process.env.SMTP_USER || 'ramasamy.gokila@gmail.com',
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  });
+});
+
+// 1. Forgot Password: Send OTP to email
+app.post('/api/auth/forgot-password/send-otp', limit, wrap(async (q, s) => {
+  const email = String(q.body.email || '').trim().toLowerCase();
+  if (!EMAIL.test(email)) throw err(400, 'Please enter a valid email address');
+
+  const u = await db.get('SELECT id, name, email FROM users WHERE email=?', [email]);
+  if (!u) throw err(404, 'No account found with this email address');
+
+  const recent = await db.all('SELECT id FROM email_otps WHERE email=? AND purpose=? AND created_at > ?', [email, 'forgot_password', Date.now() - 6e5]);
+  if (recent.length >= 4) throw err(429, 'Too many OTP requests. Please wait a few minutes before trying again.');
+
+  const otp = String(crypto.randomInt(100000, 999999));
+  const now = Date.now();
+  const expiresAt = now + 10 * 60 * 1000;
+
+  await db.run('DELETE FROM email_otps WHERE email=? AND purpose=?', [email, 'forgot_password']);
+  await db.run('INSERT INTO email_otps(email, otp, purpose, expires_at, created_at) VALUES(?,?,?,?,?)', [email, otp, 'forgot_password', expiresAt, now]);
+
+  const mailRes = await mailer.sendOtpEmail({ to: email, otp, purpose: 'forgot_password', name: u.name });
+
+  s.json({
+    ok: true,
+    message: `A 6-digit verification code has been sent to ${email}`,
+    devOtp: mailRes && mailRes.simulated ? otp : undefined,
+    configured: mailer.isConfigured()
+  });
+}));
+
+// 2. Forgot Password: Verify OTP
+app.post('/api/auth/forgot-password/verify-otp', limit, wrap(async (q, s) => {
+  const email = String(q.body.email || '').trim().toLowerCase();
+  const otp = String(q.body.otp || '').trim();
+  if (!EMAIL.test(email)) throw err(400, 'Invalid email');
+  if (!/^\d{6}$/.test(otp)) throw err(400, 'Enter the 6-digit OTP code');
+
+  const rec = await db.get('SELECT * FROM email_otps WHERE email=? AND purpose=? ORDER BY id DESC LIMIT 1', [email, 'forgot_password']);
+  if (!rec || Date.now() > rec.expires_at) {
+    throw err(400, 'OTP code has expired. Please request a new code.');
+  }
+
+  if (rec.attempts >= 5) {
+    await db.run('DELETE FROM email_otps WHERE id=?', [rec.id]);
+    throw err(400, 'Too many incorrect attempts. Please request a new OTP code.');
+  }
+
+  if (rec.otp !== otp) {
+    await db.run('UPDATE email_otps SET attempts = attempts + 1 WHERE id=?', [rec.id]);
+    const rem = 5 - (rec.attempts + 1);
+    throw err(400, `Invalid verification code. ${rem} attempt(s) remaining.`);
+  }
+
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  await db.run('UPDATE email_otps SET verified=1, token=?, expires_at=? WHERE id=?', [resetToken, Date.now() + 15 * 60 * 1000, rec.id]);
+
+  s.json({
+    ok: true,
+    reset_token: resetToken,
+    message: 'OTP verified successfully. You may now enter your new password.'
+  });
+}));
+
+// 3. Forgot Password: Reset Password with verified token
+app.post('/api/auth/forgot-password/reset', limit, wrap(async (q, s) => {
+  const email = String(q.body.email || '').trim().toLowerCase();
+  const resetToken = String(q.body.reset_token || '').trim();
+  const newPw = String(q.body.password || '');
+
+  if (!EMAIL.test(email)) throw err(400, 'Invalid email');
+  if (!resetToken) throw err(400, 'Missing reset verification token. Please verify OTP first.');
+  if (newPw.length < 6) throw err(400, 'New password must be at least 6 characters');
+
+  const rec = await db.get('SELECT * FROM email_otps WHERE email=? AND purpose=? AND token=? AND verified=1', [email, 'forgot_password', resetToken]);
+  if (!rec || Date.now() > rec.expires_at) {
+    throw err(400, 'Password reset session has expired. Please request and verify OTP again.');
+  }
+
+  const hash = bcrypt.hashSync(newPw, 10);
+  await db.run('UPDATE users SET hash=? WHERE email=?', [hash, email]);
+  await db.run('DELETE FROM email_otps WHERE id=?', [rec.id]);
+
+  s.json({
+    ok: true,
+    message: 'Password reset successfully! You can now log in with your new password.'
+  });
+}));
+
+// 4. Email OTP Direct Login: Send OTP
+app.post('/api/auth/otp/send', limit, wrap(async (q, s) => {
+  const email = String(q.body.email || '').trim().toLowerCase();
+  if (!EMAIL.test(email)) throw err(400, 'Please enter a valid email address');
+
+  const u = await db.get('SELECT id, name, email FROM users WHERE email=?', [email]);
+  const userName = u ? u.name : email.split('@')[0];
+
+  const recent = await db.all('SELECT id FROM email_otps WHERE email=? AND purpose=? AND created_at > ?', [email, 'login', Date.now() - 6e5]);
+  if (recent.length >= 4) throw err(429, 'Too many OTP requests. Please wait a few minutes before trying again.');
+
+  const otp = String(crypto.randomInt(100000, 999999));
+  const now = Date.now();
+  const expiresAt = now + 10 * 60 * 1000;
+
+  await db.run('DELETE FROM email_otps WHERE email=? AND purpose=?', [email, 'login']);
+  await db.run('INSERT INTO email_otps(email, otp, purpose, expires_at, created_at) VALUES(?,?,?,?,?)', [email, otp, 'login', expiresAt, now]);
+
+  const mailRes = await mailer.sendOtpEmail({ to: email, otp, purpose: 'login', name: userName });
+
+  s.json({
+    ok: true,
+    message: `A 6-digit login code has been sent to ${email}`,
+    devOtp: mailRes && mailRes.simulated ? otp : undefined,
+    configured: mailer.isConfigured()
+  });
+}));
+
+// 5. Email OTP Direct Login: Verify & Sign In
+app.post('/api/auth/otp/verify', limit, wrap(async (q, s) => {
+  const email = String(q.body.email || '').trim().toLowerCase();
+  const otp = String(q.body.otp || '').trim();
+  if (!EMAIL.test(email)) throw err(400, 'Invalid email');
+  if (!/^\d{6}$/.test(otp)) throw err(400, 'Enter the 6-digit OTP code');
+
+  const rec = await db.get('SELECT * FROM email_otps WHERE email=? AND purpose=? ORDER BY id DESC LIMIT 1', [email, 'login']);
+  if (!rec || Date.now() > rec.expires_at) {
+    throw err(400, 'OTP code has expired. Please request a new login code.');
+  }
+
+  if (rec.attempts >= 5) {
+    await db.run('DELETE FROM email_otps WHERE id=?', [rec.id]);
+    throw err(400, 'Too many incorrect attempts. Please request a new login code.');
+  }
+
+  if (rec.otp !== otp) {
+    await db.run('UPDATE email_otps SET attempts = attempts + 1 WHERE id=?', [rec.id]);
+    const rem = 5 - (rec.attempts + 1);
+    throw err(400, `Invalid verification code. ${rem} attempt(s) remaining.`);
+  }
+
+  await db.run('DELETE FROM email_otps WHERE id=?', [rec.id]);
+
+  let u = await db.get('SELECT * FROM users WHERE email=?', [email]);
+  if (!u) {
+    const dummyHash = bcrypt.hashSync(crypto.randomBytes(16).toString('hex'), 10);
+    const res = await db.run('INSERT INTO users(name,email,hash,role,created) VALUES(?,?,?,?,?)', [email.split('@')[0], email, dummyHash, 'customer', new Date().toISOString()]);
+    u = await db.get('SELECT * FROM users WHERE id=?', [res.lastInsertRowid]);
+  }
+
+  s.json({ token: sign(u), user: pubU(u), message: 'Logged in successfully!' });
 }));
 
 app.get('/api/me', need, (q, s) => s.json(pubU(q.user)));

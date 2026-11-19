@@ -860,12 +860,265 @@ function renderRingSarees(){
   const step = 360 / items.length;
   return items.map((p,i)=>`<div class="ring-card" style="background:radial-gradient(circle at 30% 30%,#6a1230,#2a0814);--r:${i*step}deg"><svg viewBox="0 0 24 24" style="width:32px;height:32px;stroke:#c9a24a;fill:none;stroke-width:1.5;margin-bottom:8px"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg><b style="font-size:12px;line-height:1.2;color:#f3d58a;margin-bottom:4px">${(p.name||'Silk Saree').slice(0,22)}</b><span style="font-size:11px;color:#c9a24a;font-weight:600">${inr(p.price||1999)}</span></div>`).join('');
 }
+let otpLoginActive = false, otpLoginStep = 1, otpLoginEmail = '', otpTimer = 0, otpInterval = null;
+let fpState = { step: 1, email: '', resetToken: '', timer: 0, interval: null, devOtp: '' };
+
+function toggleOtpLogin(val){
+  otpLoginActive = (typeof val === 'boolean') ? val : !otpLoginActive;
+  otpLoginStep = 1;
+  route();
+}
+
+function startOtpTimer(isFp){
+  if (isFp) {
+    fpState.timer = 60;
+    if (fpState.interval) clearInterval(fpState.interval);
+    fpState.interval = setInterval(() => {
+      fpState.timer--;
+      const el = $('#fp_cd');
+      if (el) el.textContent = fpState.timer;
+      if (fpState.timer <= 0) {
+        clearInterval(fpState.interval);
+        const tbox = $('#fp_timer_box');
+        if (tbox) tbox.innerHTML = '<a href="javascript:void(0)" onclick="doForgotSendOtp(true)" style="color:var(--mag);font-weight:600">Resend Code</a>';
+      }
+    }, 1000);
+  } else {
+    otpTimer = 60;
+    if (otpInterval) clearInterval(otpInterval);
+    otpInterval = setInterval(() => {
+      otpTimer--;
+      const el = $('#otp_cd');
+      if (el) el.textContent = otpTimer;
+      if (otpTimer <= 0) {
+        clearInterval(otpInterval);
+        const tbox = $('#otp_timer_box');
+        if (tbox) tbox.innerHTML = '<a href="javascript:void(0)" onclick="doSendLoginOtp(true)" style="color:var(--mag);font-weight:600">Resend Code</a>';
+      }
+    }, 1000);
+  }
+}
+
+async function doSendLoginOtp(isResend){
+  const e = (isResend ? otpLoginEmail : ($('#e') ? $('#e').value : '')).trim().toLowerCase();
+  if (!e || !e.includes('@')) return toast('Please enter a valid email address');
+  otpLoginEmail = e;
+  const btn = $('#otp_send_btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending code...'; }
+  try {
+    const r = await api('POST', '/auth/otp/send', { email: e });
+    otpLoginStep = 2;
+    startOtpTimer(false);
+    toast(r.message || 'Verification code sent to ' + e);
+    route();
+  } catch(err) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send Login Code'; }
+    toast(err.message || 'Failed to send login code');
+  }
+}
+
+async function doVerifyLoginOtp(){
+  const inp = $('#otp_code');
+  if (!inp) return;
+  const code = inp.value.trim();
+  if (!/^\d{6}$/.test(code)) return toast('Please enter the 6-digit code');
+  const btn = $('#otp_verify_btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Verifying...'; }
+  try {
+    const r = await api('POST', '/auth/otp/verify', { email: otpLoginEmail, otp: code });
+    TOK = r.token; ST('tok', TOK);
+    user = r.user; ST('user', user);
+    otpLoginActive = false; otpLoginStep = 1;
+    if (otpInterval) clearInterval(otpInterval);
+    await loadProducts(); await loadOrders(); counts();
+    toast('Welcome back, ' + user.name + '!');
+    location.hash = '#/';
+  } catch(err) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Verify & Sign In'; }
+    toast(err.message || 'Verification failed');
+  }
+}
+
+function forgotPasswordView(){
+  if (user) return `<div class="pg"><div class="panel" style="max-width:480px"><h2>Already signed in</h2><p>You are signed in as <b>${esc(user.email)}</b>.</p><p style="margin-top:16px"><a class="btn" href="#/">Continue to Home</a> <a class="btn o" href="#/account">My Account</a></p></div></div>`;
+
+  let inner = '';
+
+  if (fpState.step === 1) {
+    inner = `
+      <h2>Reset Password</h2>
+      <p class="sub" style="font-size:13.5px;color:#666;margin-bottom:18px">
+        Enter your registered email address. We will send you a 6-digit verification code to reset your password.
+      </p>
+      <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;color:#444">Registered Email</label>
+      <input id="fp_email" type="email" placeholder="e.g. yourname@gmail.com" value="${esc(fpState.email)}" onkeydown="if(event.key==='Enter')doForgotSendOtp()">
+      <button class="btn" id="fp_send_btn" style="width:100%;margin-top:10px" onclick="doForgotSendOtp()">Send Verification Code</button>
+      <p style="margin-top:16px;text-align:center">
+        <a href="#/login" style="color:var(--mag);font-size:13px;text-decoration:none;font-weight:600">← Back to Login</a>
+      </p>
+    `;
+  } else if (fpState.step === 2) {
+    inner = `
+      <h2>Enter Verification Code</h2>
+      <div style="background:#fdf8f4;border:1px solid #ebd8ca;border-radius:10px;padding:12px 14px;margin-bottom:18px;font-size:13px;color:#5a0f2a;line-height:1.5">
+        ✉ We sent a 6-digit code to <b>${esc(fpState.email)}</b>.<br>
+        <small style="color:#777">Check your inbox or spam folder. Code is valid for 10 minutes.</small>
+      </div>
+      <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;color:#444">6-Digit Verification Code</label>
+      <input id="fp_otp" type="text" maxlength="6" inputmode="numeric" placeholder="• • • • • •" style="font-size:24px;letter-spacing:10px;text-align:center;font-weight:700;color:#5a0f2a" onkeydown="if(event.key==='Enter')doForgotVerifyOtp()">
+      <div id="fp_timer_box" style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#777;margin:8px 0 16px">
+        <span>Resend code in <b id="fp_cd">${fpState.timer || 60}</b>s</span>
+        <a href="javascript:void(0)" onclick="fpState.step=1;route()" style="color:#888;text-decoration:underline">Change email</a>
+      </div>
+      <button class="btn" id="fp_verify_btn" style="width:100%" onclick="doForgotVerifyOtp()">Verify Code →</button>
+      <p style="margin-top:16px;text-align:center">
+        <a href="#/login" style="color:var(--mag);font-size:13px;text-decoration:none">← Cancel & Back to Login</a>
+      </p>
+    `;
+  } else if (fpState.step === 3) {
+    inner = `
+      <h2>Set New Password</h2>
+      <div style="background:#eaf7ee;border:1px solid #b7e4c7;color:#1e4620;border-radius:10px;padding:12px 14px;margin-bottom:18px;font-size:13px;line-height:1.5">
+        ✓ <b>Email verified!</b> Code confirmed for <b>${esc(fpState.email)}</b>.<br>
+        Please enter your new password below.
+      </div>
+      <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;color:#444">New Password</label>
+      <input id="fp_new_pw" type="password" placeholder="At least 6 characters" minlength="6">
+      <label style="font-size:12px;font-weight:600;display:block;margin-top:10px;margin-bottom:4px;color:#444">Confirm New Password</label>
+      <input id="fp_conf_pw" type="password" placeholder="Re-enter new password" onkeydown="if(event.key==='Enter')doForgotResetPw()">
+      <button class="btn" id="fp_reset_btn" style="width:100%;margin-top:14px" onclick="doForgotResetPw()">Update Password</button>
+      <p style="margin-top:16px;text-align:center">
+        <a href="#/login" style="color:var(--mag);font-size:13px;text-decoration:none">← Back to Login</a>
+      </p>
+    `;
+  }
+
+  const PK = ['Safe & secure encrypted login', '100% verified customer accounts', 'AI Virtual Try-On access', 'Track orders anytime'];
+  return `
+    <div class="pg auth">
+      <section class="stage" aria-label="Account Recovery">
+        <p class="eyebrow">ACCOUNT RECOVERY</p>
+        <h1 class="serif">Reset Your Password</h1>
+        <p class="lead">Verify your registered email address using a secure 6-digit one-time code to regain access to your account.</p>
+        <div class="scene" aria-hidden="true"><div class="ring">${renderRingSarees()}</div></div>
+        <ul class="perks">${PK.map(x=>`<li>✦ ${x}</li>`).join('')}</ul>
+      </section>
+      <div class="panel authp" style="max-width:440px">
+        ${inner}
+      </div>
+    </div>
+  `;
+}
+
+async function doForgotSendOtp(isResend){
+  const e = (isResend ? fpState.email : ($('#fp_email') ? $('#fp_email').value : '')).trim().toLowerCase();
+  if (!e || !e.includes('@')) return toast('Please enter a valid email address');
+  fpState.email = e;
+  const btn = $('#fp_send_btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending code...'; }
+  try {
+    const r = await api('POST', '/auth/forgot-password/send-otp', { email: e });
+    fpState.step = 2;
+    startOtpTimer(true);
+    toast(r.message || 'Verification code sent to ' + e);
+    route();
+  } catch(err) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send Verification Code'; }
+    toast(err.message || 'Failed to send verification code');
+  }
+}
+
+async function doForgotVerifyOtp(){
+  const inp = $('#fp_otp');
+  if (!inp) return;
+  const code = inp.value.trim();
+  if (!/^\d{6}$/.test(code)) return toast('Please enter the 6-digit code');
+  const btn = $('#fp_verify_btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Verifying...'; }
+  try {
+    const r = await api('POST', '/auth/forgot-password/verify-otp', { email: fpState.email, otp: code });
+    fpState.resetToken = r.reset_token;
+    fpState.step = 3;
+    if (fpState.interval) clearInterval(fpState.interval);
+    toast('✓ Code verified! Please enter your new password.');
+    route();
+  } catch(err) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Verify Code →'; }
+    toast(err.message || 'Verification code is invalid or expired');
+  }
+}
+
+async function doForgotResetPw(){
+  const p1 = ($('#fp_new_pw') || {}).value || '';
+  const p2 = ($('#fp_conf_pw') || {}).value || '';
+  if (p1.length < 6) return toast('Password must be at least 6 characters');
+  if (p1 !== p2) return toast('Passwords do not match. Please check and try again.');
+  const btn = $('#fp_reset_btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Updating password...'; }
+  try {
+    const r = await api('POST', '/auth/forgot-password/reset', {
+      email: fpState.email,
+      reset_token: fpState.resetToken,
+      password: p1
+    });
+    toast('✓ Password updated successfully! Please log in with your new password.');
+    fpState = { step: 1, email: '', resetToken: '', timer: 0, interval: null, devOtp: '' };
+    location.hash = '#/login';
+  } catch(err) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Update Password'; }
+    toast(err.message || 'Failed to update password');
+  }
+}
+
 function auth(reg){
 if(user)return `<div class="pg"><div class="panel" style="max-width:480px"><h2>Already signed in</h2><p>You are signed in as <b>${esc(user.email)}</b>.</p><p style="margin-top:16px"><a class="btn" href="#/">Continue to Home</a> <a class="btn o" href="#/account">My Account</a> <button class="btn o" onclick="logout();location.hash='#/'">Logout</button></p></div></div>`;
 const T=reg?['Join Sreekrishna','Create your account to save favourites, track orders and try sarees with AI.']:['Welcome back','Sign in to continue shopping, track your orders and try sarees with AI.'],
 PK=['Free delivery above ₹2,999','7-day easy returns','AI Virtual Try-On','Authentic handloom silks'];
 return `<div class="pg auth"><section class="stage" aria-label="Featured sarees"><p class="eyebrow">TRADITION MEETS ELEGANCE</p><h1 class="serif">${T[0]}</h1><p class="lead">${T[1]}</p><div class="scene" aria-hidden="true"><div class="ring">${renderRingSarees()}</div></div><ul class="perks">${PK.map(x=>`<li>✦ ${x}</li>`).join('')}</ul></section>
-<div class="panel authp"><h2>${reg?'Create customer account':'Login'}</h2>${reg?'<input id="n" aria-label="Name" placeholder="Name">':''}<input id="e" type="email" aria-label="Email" placeholder="Email"><input id="pw" type="password" aria-label="Password" placeholder="Password" onkeydown="if(event.key==='Enter')doAuth(${reg})">${!reg?'<p class="sub">Customers: log in, or register a new account.</p>':''}<button class="btn" onclick="doAuth(${reg})">${reg?'Create account':'Login'}</button><p style="margin-top:10px"><a href="#/${reg?'login':'register'}" style="color:var(--mag)">${reg?'Have an account? Login':'New customer? Register'}</a></p></div></div>`}
+${(() => {
+  if (!reg && otpLoginActive) {
+    return `<div class="panel authp">
+      <h2>Login with OTP</h2>
+      <p class="sub">Sign in securely using a 6-digit code sent to your email.</p>
+      ${otpLoginStep === 1 ? `
+        <input id="e" type="email" aria-label="Email" placeholder="Enter your email address" value="${esc(otpLoginEmail)}" onkeydown="if(event.key==='Enter')doSendLoginOtp()">
+        <button class="btn" id="otp_send_btn" onclick="doSendLoginOtp()">Send Login Code</button>
+        <p style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;font-size:12.5px">
+          <a href="javascript:void(0)" onclick="toggleOtpLogin(false)" style="color:var(--mag);font-weight:600">← Password Login</a>
+          <a href="#/register" style="color:var(--mag)">New customer? Register</a>
+        </p>
+      ` : `
+        <div style="background:#fdf8f4;border:1px solid #ebd8ca;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12.5px;color:#5a0f2a">
+          ✉ Code sent to <b>${esc(otpLoginEmail)}</b>
+        </div>
+        <input id="otp_code" type="text" maxlength="6" inputmode="numeric" placeholder="• • • • • •" style="font-size:22px;letter-spacing:8px;text-align:center;font-weight:700;color:#5a0f2a" onkeydown="if(event.key==='Enter')doVerifyLoginOtp()">
+        <div id="otp_timer_box" style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#777;margin:6px 0 14px">
+          <span>Resend code in <b id="otp_cd">${otpTimer || 60}</b>s</span>
+          <a href="javascript:void(0)" onclick="otpLoginStep=1;route()" style="color:#888;text-decoration:underline">Change email</a>
+        </div>
+        <button class="btn" id="otp_verify_btn" onclick="doVerifyLoginOtp()">Verify & Sign In</button>
+        <p style="margin-top:14px;text-align:center">
+          <a href="javascript:void(0)" onclick="toggleOtpLogin(false)" style="color:var(--mag);font-size:12.5px">← Sign in with password instead</a>
+        </p>
+      `}
+    </div>`;
+  }
+  return `<div class="panel authp">
+    <h2>${reg?'Create customer account':'Login'}</h2>
+    ${reg?'<input id="n" aria-label="Name" placeholder="Name">':''}
+    <input id="e" type="email" aria-label="Email" placeholder="Email">
+    <input id="pw" type="password" aria-label="Password" placeholder="Password" onkeydown="if(event.key==='Enter')doAuth(${reg})">
+    ${!reg ? `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 12px;font-size:12.5px">
+        <a href="#/forgot" style="color:var(--mag);text-decoration:underline">Forgot password?</a>
+        <a href="javascript:void(0)" onclick="toggleOtpLogin(true)" style="color:#8a4d2e;font-weight:600">⚡ Login with OTP</a>
+      </div>
+    ` : ''}
+    ${!reg?'<p class="sub">Customers: log in, or register a new account.</p>':''}
+    <button class="btn" onclick="doAuth(${reg})">${reg?'Create account':'Login'}</button>
+    <p style="margin-top:12px"><a href="#/${reg?'login':'register'}" style="color:var(--mag)">${reg?'Have an account? Login':'New customer? Register'}</a></p>
+  </div>`;
+})()}</div>`}
 function doAuth(reg){const e=$('#e').value.trim(),pw=$('#pw').value;if(!e)return toast('Enter email');if(!pw)return toast('Enter password');
 if(e.toLowerCase()==ADM.e)return toast('Invalid email or password');
 user={name:($('#n')||{}).value||e.split('@')[0],email:e,role:'customer'};addUser(user);
@@ -1407,7 +1660,7 @@ if(!k)out=home();else if(k=='c'){const rawSlug=h[1]||'sarees',slug=rawSlug=='sui
 else if(k=='s'){const q=decodeURIComponent(h[1]||'');out=listing('Results for "'+q+'"',search(q),'s')}
 else if(k=='product')out=product(h[1]);else if(k=='tryon')out=tryon(h[1],h[2]);else if(k=='cart')out=cartPage();else if(k=='checkout'){if(lastK!='checkout'&&ck.step==5)ck.step=0;out=checkout()}
 else if(k=='wishlist')out=`<div class="pg"><h2>Wishlist</h2><div class="grid">${wish.map(id=>{const p=find(id);return card(p).replace('Quick View','AI Try-On').replace(`qv('${p.id}')`,`location.hash='#/tryon/${p.id}'`)}).join('')||'<p>Nothing saved yet.</p>'}</div></div>`;
-else if(k=='login'||k=='register')out=auth(k=='register');else if(k=='account')out=account();else if(k=='orders')out=ordersPage();else if(k=='order')out=ordersPage(h[1]);else if(k=='admin')out=admin(h[1],h[2]);else if(k=='track')out=trackPage();
+else if(k=='login'||k=='register')out=auth(k=='register');else if(k=='forgot'||k=='forgot-password')out=forgotPasswordView();else if(k=='account')out=account();else if(k=='orders')out=ordersPage();else if(k=='order')out=ordersPage(h[1]);else if(k=='admin')out=admin(h[1],h[2]);else if(k=='track')out=trackPage();
 else if(k=='p'&&PAGES[h[1]])out=`<div class="pg"><h2>${PAGES[h[1]][0]}</h2><div class="panel">${PAGES[h[1]][1]}</div></div>`;else out='<div class="pg"><h2>Page not found</h2></div>';
 app.innerHTML=out;{const t=app.querySelector('.pg h2');if(t){const h1=document.createElement('h1');h1.className=t.className;h1.setAttribute('style',t.getAttribute('style')||'');h1.innerHTML=t.innerHTML;t.replaceWith(h1)}const hh=app.querySelector('h1');document.title=(hh?hh.textContent+' | ':'')+'Sreekrishna Textiles';if(lastH&&!same)app.focus({preventScroll:true})}if(k=='c'||k=='s'){const key=k=='s'?'s':h[1]||'sarees';bindF(key,()=>{const y=scrollY;route();scrollTo(0,y)})}
 if(!k){petals($('#pt'));$('#hero').classList.add('on');$('#hv').style.display='none';if(!ready){ready=true}else{$('#hb').style.transform='none'}auto=setInterval(tick,7000)}
