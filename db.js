@@ -163,6 +163,21 @@ async function init() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS email_otps (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      email VARCHAR(191) NOT NULL,
+      otp VARCHAR(16) NOT NULL,
+      purpose VARCHAR(32) NOT NULL DEFAULT 'forgot_password',
+      token VARCHAR(64) DEFAULT NULL,
+      verified TINYINT DEFAULT 0,
+      attempts INT DEFAULT 0,
+      expires_at BIGINT NOT NULL,
+      created_at BIGINT NOT NULL,
+      INDEX ix_otps_email_purpose (email, purpose)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
   try {
     await pool.query('ALTER TABLE orders ADD COLUMN pay_ref VARCHAR(100) DEFAULT NULL');
   } catch (_) {}
