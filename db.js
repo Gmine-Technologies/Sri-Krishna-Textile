@@ -111,6 +111,7 @@ async function init() {
       cost INT,
       pay VARCHAR(60),
       status VARCHAR(60),
+      pay_ref VARCHAR(100) DEFAULT NULL,
       tracking VARCHAR(100) DEFAULT NULL,
       courier VARCHAR(100) DEFAULT NULL,
       eta VARCHAR(100) DEFAULT NULL,
@@ -161,6 +162,10 @@ async function init() {
       v TEXT
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  try {
+    await pool.query('ALTER TABLE orders ADD COLUMN pay_ref VARCHAR(100) DEFAULT NULL');
+  } catch (_) {}
 
   return pool;
 }

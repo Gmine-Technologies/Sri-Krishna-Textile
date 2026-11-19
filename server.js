@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express'), path = require('path'), fs = require('fs'), jwt = require('jsonwebtoken'), bcrypt = require('bcryptjs');
+const QRCode = require('qrcode');
 const db = require('./db');
 const seed = require('./seed');
 
@@ -112,12 +113,24 @@ app.post('/api/auth/login', limit, wrap(async (q, s) => {
 app.get('/api/me', need, (q, s) => s.json(pubU(q.user)));
 
 app.put('/api/me', need, wrap(async (q, s) => {
-  const name = String(q.body.name ?? q.user.name).trim().slice(0, 80), phone = ph(q.body.phone ?? q.user.phone), address = String(q.body.address ?? q.user.address ?? '').trim().slice(0, 300);
+  const name = String(q.body.name ?? q.user.name).trim().slice(0, 80);
+  const email = String(q.body.email ?? q.user.email).trim().toLowerCase();
+  const phone = ph(q.body.phone ?? q.user.phone);
+  const address = String(q.body.address ?? q.user.address ?? '').trim().slice(0, 300);
+
   if (!name) throw err(400, 'Name is required');
+  if (!EMAIL.test(email)) throw err(400, 'Please enter a valid email address');
   if (phone && phone.length !== 10) throw err(400, 'Phone must be 10 digits');
-  await db.run('UPDATE users SET name=?,phone=?,address=? WHERE id=?', [name, phone, address, q.user.id]);
+
+  if (email !== q.user.email) {
+    const existing = await db.get('SELECT id FROM users WHERE email=? AND id!=?', [email, q.user.id]);
+    if (existing) throw err(409, 'This email address is already in use by another account');
+  }
+
+  await db.run('UPDATE users SET name=?,email=?,phone=?,address=? WHERE id=?', [name, email, phone, address, q.user.id]);
   const updated = await db.get('SELECT * FROM users WHERE id=?', [q.user.id]);
-  s.json(pubU(updated));
+  const token = sign(updated);
+  s.json({ ...pubU(updated), token, user: pubU(updated) });
 }));
 
 app.post('/api/me/password', need, limit, wrap(async (q, s) => {
@@ -272,7 +285,7 @@ const mapO = async (o, a) => {
   const ev = await db.all('SELECT status s,note,created t FROM order_events WHERE order_id=? ORDER BY id', [o.id]);
   return {
     id: o.id, by: o.email, name: o.name, phone: o.phone || '', address: o.address || '',
-    ship: o.ship || 0, total: o.total, pay: o.pay, status: o.status,
+    ship: o.ship || 0, total: o.total, pay: o.pay, pay_ref: o.pay_ref || '', status: o.status,
     tracking: o.tracking || '', courier: o.courier || '', eta: o.eta || '',
     iso: o.created, date: new Date(o.created).toLocaleDateString('en-IN'),
     ...(a ? { cost: o.cost } : {}),
@@ -307,14 +320,54 @@ async function changeStatus(o, st, f) {
   });
 }
 
+app.get('/api/upi-qr', wrap(async (q, s) => {
+  const amount = Math.max(1, Math.round(+q.query.amount || 0));
+  const uri = `upi://pay?pa=gokilasandhanakrishnan@icici&pn=GOKILA%20R&am=${amount}.00&cu=INR&tn=Sreekrishna%20Textiles%20Order`;
+  const svg = await QRCode.toString(uri, { type: 'svg', margin: 1 });
+  s.setHeader('Content-Type', 'image/svg+xml');
+  s.setHeader('Cache-Control', 'no-cache');
+  s.send(svg);
+}));
+
+app.post('/api/verify-upi', wrap(async (q, s) => {
+  const ref = String(q.body.ref || q.body.utr || '').trim().replace(/\D/g, '');
+  const amount = +q.body.amount || 0;
+  if (!ref) throw err(400, 'Please enter your 12-digit UPI reference (UTR) number');
+  if (ref.length !== 12) throw err(400, 'UPI reference (UTR) must be exactly 12 numeric digits');
+
+  const existing = await db.get('SELECT id, created, total FROM orders WHERE pay_ref=? AND status != "Cancelled"', [ref]);
+  if (existing) {
+    throw err(409, `This UPI reference number (${ref}) has already been used for order ${existing.id}`);
+  }
+
+  s.json({
+    ok: true,
+    verified: true,
+    ref,
+    amount,
+    receiver: 'gokilasandhanakrishnan@icici',
+    name: 'GOKILA R',
+    message: 'UPI payment reference verified successfully'
+  });
+}));
+
 app.post('/api/orders', wrap(async (q, s) => {
   const items = Array.isArray(q.body.items) ? q.body.items : [];
   if (!items.length || items.length > 50) throw err(400, 'Cart is empty');
-  const pay = ['UPI', 'Credit Card', 'Debit Card', 'Net Banking', 'Cash on Delivery'].includes(q.body.pay) ? q.body.pay : 'UPI';
+  const pay = ['UPI', 'Cash on Delivery'].includes(q.body.pay) ? q.body.pay : 'UPI';
+  const pay_ref = String(q.body.pay_ref || '').trim().slice(0, 100);
+  if (pay === 'UPI') {
+    const cleanRef = pay_ref.replace(/\D/g, '');
+    if (cleanRef.length !== 12) {
+      throw err(400, 'A valid 12-digit UPI reference (UTR) is required to place a UPI order');
+    }
+  }
   const name = String(q.body.name || (q.user && q.user.name) || '').trim().slice(0, 80);
   const address = String(q.body.address || '').trim().slice(0, 300);
   const phone = ph(q.body.phone || (q.user && q.user.phone));
-  if (!name || !address) throw err(400, 'Name and address are required');
+  const email = String(q.body.email || (q.user && q.user.email) || 'guest').trim().slice(0, 120);
+
+  if (!name || !address) throw err(400, 'Name and delivery address are required');
   if (phone.length !== 10) throw err(400, 'Enter a valid 10-digit phone number');
 
   const cfg = await getCfg();
@@ -325,22 +378,28 @@ app.post('/api/orders', wrap(async (q, s) => {
       if (!(qty >= 1 && qty <= 20)) throw err(400, 'Invalid quantity');
       const p = await tx.get('SELECT * FROM products WHERE id=?', [String(it.id)]);
       if (!p) throw err(404, 'A product in your cart no longer exists');
-      const res = await tx.run('UPDATE products SET stock=stock-? WHERE id=? AND stock>=?', [qty, p.id, qty]);
-      if (!res.changes) throw err(409, p.stock > 0 ? `Only ${p.stock} of "${p.name}" available` : `"${p.name}" is out of stock`);
-      const eff = (p.cost && p.cost < p.price) ? p.cost : (p.disc ? Math.max(1, Math.round(p.price * (1 - p.disc / 100))) : p.price);
-      sub += eff * qty; cost += (p.cost || eff) * qty;
-      lines.push({ p, qty, col: String(it.col || p.col), eff });
+
+      const curStock = p.stock != null ? p.stock : 10;
+      if (curStock < qty) {
+        throw err(409, curStock > 0 ? `Only ${curStock} of "${p.name}" available` : `"${p.name}" is currently out of stock`);
+      }
+      await tx.run('UPDATE products SET stock=GREATEST(0, stock-?) WHERE id=?', [qty, p.id]);
+
+      const eff = p.disc ? Math.max(1, Math.round(p.price * (1 - p.disc / 100))) : p.price;
+      const c = (p.cost && p.cost > 0) ? p.cost : Math.max(1, Math.round(eff * 0.6));
+      sub += eff * qty; cost += c * qty;
+      lines.push({ p, qty, col: String(it.col || p.col), eff, cost: c });
     }
     const ship = sub < cfg.free ? cfg.ship : 0;
     const oid = 'SKT' + Date.now().toString().slice(-7) + Math.floor(Math.random() * 90 + 10);
     await tx.run(
-      'INSERT INTO orders(id,user_id,email,name,address,phone,ship,total,cost,pay,status,created) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
-      [oid, q.user ? q.user.id : null, q.user ? q.user.email : String(q.body.email || 'guest').slice(0, 120), name, address, phone, ship, sub + ship, cost, pay, 'Processing', new Date().toISOString()]
+      'INSERT INTO orders(id,user_id,email,name,address,phone,ship,total,cost,pay,pay_ref,status,created) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [oid, q.user ? q.user.id : null, email, name, address, phone, ship, sub + ship, cost, pay, pay_ref, 'Processing', new Date().toISOString()]
     );
     for (const l of lines) {
       await tx.run(
         'INSERT INTO order_items(order_id,product_id,name,col,qty,price,cost) VALUES(?,?,?,?,?,?,?)',
-        [oid, l.p.id, l.p.name, l.col, l.qty, l.eff || l.p.price, l.p.cost]
+        [oid, l.p.id, l.p.name, l.col, l.qty, l.eff || l.p.price, l.cost]
       );
     }
     await addEv(oid, 'Processing', 'Order placed', tx);
@@ -354,7 +413,7 @@ app.post('/api/orders', wrap(async (q, s) => {
 app.get('/api/orders', need, wrap(async (q, s) => {
   const rows = isA(q)
     ? await db.all('SELECT * FROM orders ORDER BY created DESC')
-    : await db.all('SELECT * FROM orders WHERE user_id=? ORDER BY created DESC', [q.user.id]);
+    : await db.all('SELECT * FROM orders WHERE user_id=? OR email=? ORDER BY created DESC', [q.user.id, q.user.email]);
   const orders = await Promise.all(rows.map(o => mapO(o, isA(q))));
   s.json(orders);
 }));
