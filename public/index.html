@@ -883,10 +883,12 @@ async function doRegSendOtp(isResend){
   const name = isResend ? regState.name : ($('#n') ? $('#n').value.trim() : '');
   const email = (isResend ? regState.email : ($('#e') ? $('#e').value.trim() : '')).toLowerCase();
   const pw = isResend ? regState.password : ($('#pw') ? $('#pw').value : '');
+  const pw2 = isResend ? regState.password : ($('#pw2') ? $('#pw2').value : '');
 
   if (!name) return toast('Please enter your full name');
   if (!email || !email.includes('@')) return toast('Please enter a valid email address');
   if (pw.length < 6) return toast('Password must be at least 6 characters');
+  if (!isResend && pw !== pw2) return toast('Passwords do not match. Please re-enter.');
 
   regState.name = name;
   regState.email = email;
@@ -1204,7 +1206,8 @@ ${(() => {
       <p class="sub">Enter your details to create an account. A 6-digit verification code will be sent to your email.</p>
       <input id="n" aria-label="Name" placeholder="Full Name" value="${esc(regState.name||'')}">
       <input id="e" type="email" aria-label="Email" placeholder="Email address" value="${esc(regState.email||'')}">
-      <input id="pw" type="password" aria-label="Password" placeholder="Create password (min 6 characters)" value="${esc(regState.password||'')}" onkeydown="if(event.key==='Enter')doRegSendOtp()">
+      <input id="pw" type="password" aria-label="Password" placeholder="Create password (min 6 characters)" value="${esc(regState.password||'')}" onkeydown="if(event.key==='Enter'){if(!$('#pw2').value)$('#pw2').focus();else doRegSendOtp()}">
+      <input id="pw2" type="password" aria-label="Confirm Password" placeholder="Confirm password" value="${esc(regState.password||'')}" onkeydown="if(event.key==='Enter')doRegSendOtp()">
       <button class="btn" id="reg_btn" onclick="doRegSendOtp()">Verify Email & Create Account</button>
       <p style="margin-top:12px"><a href="#/login" style="color:var(--mag)" onclick="regState.step=1">Already have an account? Login</a></p>
     </div>`;
