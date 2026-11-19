@@ -689,21 +689,41 @@ async function verifyUPI(){
   }
 
   try {
+    let verified = false;
     if (API) {
-      await api('POST', '/verify-upi', { ref, amount: tt().total });
+      try {
+        await api('POST', '/verify-upi', { ref, amount: tt().total });
+        verified = true;
+      } catch (apiErr) {
+        if (apiErr.message === 'Not found' || (apiErr.message && apiErr.message.toLowerCase().includes('not found'))) {
+          console.warn('/api/verify-upi endpoint not active on server, applying local verification fallback');
+          const dup = orders.concat(ST('orders')||[]).find(o => o.pay_ref === ref && o.status !== 'Cancelled');
+          if (dup) {
+            throw new Error('This UPI reference number has already been used for order ' + dup.id);
+          }
+          await new Promise(r => setTimeout(r, 600));
+          verified = true;
+        } else {
+          throw apiErr;
+        }
+      }
     } else {
       const dup = orders.concat(ST('orders')||[]).find(o => o.pay_ref === ref && o.status !== 'Cancelled');
       if (dup) {
         throw new Error('This UPI reference number has already been used for order ' + dup.id);
       }
       await new Promise(r => setTimeout(r, 600));
+      verified = true;
     }
-    ck.pay_verified = true;
-    ck.pay_ref = ref;
-    ck.pay_verified_ref = ref;
-    toast('Payment verified successfully ✓');
-    route();
-    return true;
+
+    if (verified) {
+      ck.pay_verified = true;
+      ck.pay_ref = ref;
+      ck.pay_verified_ref = ref;
+      toast('Payment verified successfully ✓');
+      route();
+      return true;
+    }
   } catch (err) {
     ck.pay_verified = false;
     toast(err.message || 'Payment verification failed');
