@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express'), path = require('path'), fs = require('fs'), jwt = require('jsonwebtoken'), bcrypt = require('bcryptjs');
+const QRCode = require('qrcode');
 const db = require('./db');
 const seed = require('./seed');
 
@@ -318,6 +319,15 @@ async function changeStatus(o, st, f) {
     await addEv(o.id, st, f.note, tx);
   });
 }
+
+app.get('/api/upi-qr', wrap(async (q, s) => {
+  const amount = Math.max(1, Math.round(+q.query.amount || 0));
+  const uri = `upi://pay?pa=gokilasandhanakrishnan@icici&pn=GOKILA%20R&am=${amount}.00&cu=INR&tn=Sreekrishna%20Textiles%20Order`;
+  const svg = await QRCode.toString(uri, { type: 'svg', margin: 1 });
+  s.setHeader('Content-Type', 'image/svg+xml');
+  s.setHeader('Cache-Control', 'no-cache');
+  s.send(svg);
+}));
 
 app.post('/api/verify-upi', wrap(async (q, s) => {
   const ref = String(q.body.ref || q.body.utr || '').trim().replace(/\D/g, '');
