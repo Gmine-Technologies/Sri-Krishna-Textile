@@ -319,11 +319,39 @@ async function changeStatus(o, st, f) {
   });
 }
 
+app.post('/api/verify-upi', wrap(async (q, s) => {
+  const ref = String(q.body.ref || q.body.utr || '').trim().replace(/\D/g, '');
+  const amount = +q.body.amount || 0;
+  if (!ref) throw err(400, 'Please enter your 12-digit UPI reference (UTR) number');
+  if (ref.length !== 12) throw err(400, 'UPI reference (UTR) must be exactly 12 numeric digits');
+
+  const existing = await db.get('SELECT id, created, total FROM orders WHERE pay_ref=? AND status != "Cancelled"', [ref]);
+  if (existing) {
+    throw err(409, `This UPI reference number (${ref}) has already been used for order ${existing.id}`);
+  }
+
+  s.json({
+    ok: true,
+    verified: true,
+    ref,
+    amount,
+    receiver: 'gokilasandhanakrishnan@icici',
+    name: 'GOKILA R',
+    message: 'UPI payment reference verified successfully'
+  });
+}));
+
 app.post('/api/orders', wrap(async (q, s) => {
   const items = Array.isArray(q.body.items) ? q.body.items : [];
   if (!items.length || items.length > 50) throw err(400, 'Cart is empty');
   const pay = ['UPI', 'Credit Card', 'Debit Card', 'Net Banking', 'Cash on Delivery'].includes(q.body.pay) ? q.body.pay : 'UPI';
   const pay_ref = String(q.body.pay_ref || '').trim().slice(0, 100);
+  if (pay === 'UPI') {
+    const cleanRef = pay_ref.replace(/\D/g, '');
+    if (cleanRef.length !== 12) {
+      throw err(400, 'A valid 12-digit UPI reference (UTR) is required to place a UPI order');
+    }
+  }
   const name = String(q.body.name || (q.user && q.user.name) || '').trim().slice(0, 80);
   const address = String(q.body.address || '').trim().slice(0, 300);
   const phone = ph(q.body.phone || (q.user && q.user.phone));
