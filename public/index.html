@@ -78,11 +78,13 @@ select,.panel input,.panel select,.bar input{color:var(--ink);background:#fff}.b
 .stage .eyebrow{letter-spacing:3px;font-size:13px;color:#8a5a2b;margin:0}.stage h1{font-size:clamp(36px,4.6vw,62px);color:var(--bur);line-height:1.06;margin:8px 0}.stage .lead{max-width:470px;color:#5b4540;line-height:1.6}
 .scene{perspective:1100px;height:370px;margin:14px 0;display:grid;place-items:center;position:relative}.scene:after{content:'';position:absolute;bottom:14px;width:360px;height:36px;background:radial-gradient(#0003,transparent 70%)}
 .ring{position:relative;width:170px;height:240px;transform-style:preserve-3d;animation:spin 28s linear infinite;transform:rotateX(-6deg)}.scene:hover .ring{animation-play-state:paused}
-.ring img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:14px;border:3px solid #f3d58a;box-shadow:0 18px 40px #5a0f2a55;transform:rotateY(var(--r)) translateZ(215px)}
+.ring > *{position:absolute;inset:0;width:100%;height:100%;border-radius:14px;border:3px solid #f3d58a;box-shadow:0 18px 40px rgba(90,15,42,0.35);transform:rotateY(var(--r)) translateZ(215px);backface-visibility:hidden;box-sizing:border-box}
+.ring img{object-fit:cover;display:block}
+.ring .ring-card{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:14px;color:#f3d58a;box-sizing:border-box}
 @keyframes spin{to{transform:rotateX(-6deg) rotateY(360deg)}}
 .perks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;list-style:none;padding:0;margin:0}.perks li{background:#fffc;border:1px solid #ecd3a0;border-radius:12px;padding:10px 14px;font-size:14px}
 .authp{max-width:440px;width:100%;justify-self:center}
-@media(max-width:900px){.auth{grid-template-columns:1fr;min-height:0;gap:20px}.scene{height:290px}.ring{width:130px;height:185px}.ring img{transform:rotateY(var(--r)) translateZ(165px)}}
+@media(max-width:900px){.auth{grid-template-columns:1fr;min-height:0;gap:20px}.scene{height:290px}.ring{width:130px;height:185px}.ring > *{transform:rotateY(var(--r)) translateZ(165px)}}
 @media(prefers-reduced-motion:reduce){.ring{animation:none}}
 .tl{list-style:none;padding:0;margin:18px 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:8px}
 .tl li{position:relative;padding-top:26px;font-size:13px;color:#8a7570}.tl li:before{content:'';position:absolute;top:2px;left:0;width:16px;height:16px;border-radius:50%;background:#eadccf;border:2px solid #d9c3b4;z-index:1}.tl li:after{content:'';position:absolute;top:9px;left:18px;right:-8px;height:3px;background:#eadccf}.tl li:last-child:after{display:none}
@@ -363,14 +365,276 @@ return `<div class="pg"><h2>Shopping Cart</h2>${act.length?'':'<p>Your cart is e
 let CFG=Object.assign({store:'Sreekrishna Textiles',phone:'+91 9976392317',email:'ramasamy.gokila@gmail.com',addr:'No. 10 Shopping Mall 1st Floor, Kovai Road, Pollachi - 642002',ship:99,free:2999,low:8},ST('cfg')||{});
 const esc=x=>String(x==null?'':x).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 const STS=['Processing','Shipped','Out for Delivery','Delivered','Cancelled'],STEPS=['Processing','Shipped','Out for Delivery','Delivered'],SLAB={'Processing':'Processing','Shipped':'Shipped','Out for Delivery':'Out for delivery','Delivered':'Delivered'},DN={Processing:'Order is being processed',Shipped:'Your order has been shipped','Out for Delivery':'Out for delivery today',Delivered:'Delivered successfully',Cancelled:'Order cancelled'};
-function tt(){const a=cart.filter(i=>!i.later);let sub=0,mrp=0;a.forEach(i=>{const p=find(i.id);if(p){sub+=effPr(p)*i.q;mrp+=mrpPr(p)*i.q;}});const del=sub&&sub<CFG.free?CFG.ship:0;return{sub,save:Math.max(0,mrp-sub),del,total:sub+del}}
+function tt(){const a=cart.filter(i=>!i.later);let sub=0,mrp=0;a.forEach(i=>{const p=find(i.id);if(p){sub+=effPr(p)*i.q;mrp+=mrpPr(p)*i.q;}else if(i.price){sub+=(+i.price)*i.q;mrp+=(+(i.mrp||i.price))*i.q;}});let del=sub&&sub<CFG.free?CFG.ship:0;if(typeof ck!=='undefined'&&ck&&ck.delivery==='express')del+=199;return{sub,save:Math.max(0,mrp-sub),del,total:sub+del}}
 const sv=()=>{ST('cart',cart);counts();route()};const qty=(i,d)=>{cart[i].q=Math.max(1,cart[i].q+d);sv()};const later=i=>{cart[i].later=!cart[i].later;sv()};
-let ck={step:0,pay:'UPI',addr:{}};
-function checkout(){const S=['Login','Address','Delivery','Payment','Review','Done'];const t=tt();if(!t.sub&&ck.step<5)return'<div class="pg"><h2>Checkout</h2><p>Your cart is empty.</p></div>';
-const body=[`<p>Continue as ${user?user.name:'guest'} or <a href="#/login" style="color:var(--mag)">login</a>.</p><button class="btn" onclick="nx()">Continue as Guest</button>`,`<input id="a1" aria-label="Full name" placeholder="Full name" value="${esc(ck.addr.n||(user&&user.name)||'')}"><input id="a2" aria-label="Phone" inputmode="numeric" placeholder="Phone (10 digits)" value="${esc(ck.addr.p||(user&&user.phone)||'')}"><input id="a3" aria-label="Address" placeholder="House, street, area" value="${esc(ck.addr.a||(user&&user.address)||'')}"><input id="a4" aria-label="City / Pincode" placeholder="City / Pincode" value="${esc(ck.addr.c||'')}">`,`<label><input type="radio" name="d" checked style="width:auto"> Standard (3–7 days)</label><br><label><input type="radio" name="d" style="width:auto"> Express (1–3 days) +₹199</label>`,['UPI','Credit Card','Debit Card','Net Banking','Cash on Delivery'].map(m=>`<label style="display:block;padding:6px"><input type="radio" name="pm" style="width:auto" ${ck.pay==m?'checked':''} onchange="ck.pay='${m}'"> ${m}</label>`).join('')+'<small>Demo mode — no real payment is taken.</small>',`<p>${cart.filter(i=>!i.later).map(i=>find(i.id).name+' × '+i.q).join('<br>')}</p><h3>Total ${inr(t.total)} · ${ck.pay}</h3>`,`<h3>Order Confirmed!</h3><p>Order <b>${ck.oid}</b> placed. Thank you!</p><a class="btn" href="#/order/${ck.oid}">Track this order</a> <a class="btn o" href="#/orders">All orders</a>`][ck.step];
-return `<div class="pg"><h2>Checkout</h2><div class="steps">${S.map((s,i)=>`<span class="${i==ck.step?'on':''}">${i+1}. ${s}</span>`).join('')}</div><div class="panel" style="max-width:640px">${body}${ck.step>0&&ck.step<5?`<div style="margin-top:16px;display:flex;gap:10px"><button class="btn o" onclick="ck.step--;route()">Back</button><button class="btn" onclick="nx()">${ck.step==4?'Place Order':'Continue'}</button></div>`:''}</div></div>`}
-function nx(){if(ck.step==1){const n=$('#a1').value.trim(),p=($('#a2').value||'').replace(/\D/g,'').slice(-10),a=$('#a3').value.trim(),c=$('#a4').value.trim();if(!n||!a||!c)return toast('Please fill name, address and city / pincode');if(p.length!=10)return toast('Enter a 10-digit phone number');ck.addr={n,p,a,c}}
-if(ck.step==4){ck.oid='SKT'+Date.now().toString().slice(-7);const its=cart.filter(i=>!i.later);orders.unshift({id:ck.oid,items:its.map(i=>({...i})),total:tt().total,cost:its.reduce((a,i)=>a+find(i.id).cost*i.q,0),by:user?user.email:'guest',name:ck.addr.n,phone:ck.addr.p,address:ck.addr.a+', '+ck.addr.c,ship:tt().del,pay:ck.pay,date:new Date().toLocaleDateString('en-IN'),iso:new Date().toISOString(),status:'Processing',tracking:'',courier:'',eta:'',ev:[{s:'Processing',note:'Order placed',t:new Date().toISOString()}]});its.forEach(i=>{const p=find(i.id);svP(i.id,{stock:Math.max(0,p.stock-i.q)})});ST('orders',orders);cart=cart.filter(i=>i.later);ST('cart',cart);counts()}ck.step++;route()}
+let ck={step:0,pay:'UPI',pay_ref:'',delivery:'standard',addr:{}};
+function checkout(){
+  const S=['Account','Address','Delivery','Payment','Review','Done'];
+  const t=tt();
+  const actItems=cart.filter(i=>!i.later);
+  if(!actItems.length&&ck.step<5)return'<div class="pg"><h2>Checkout</h2><div class="panel" style="max-width:520px"><p>Your shopping cart is currently empty.</p><p style="margin-top:14px"><a class="btn" href="#/c/sarees">Browse Sarees</a></p></div></div>';
+
+  const body0 = user ? `
+    <div style="background:#fdf8f4;border:1.5px solid #ecd3a0;border-radius:12px;padding:18px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px">
+        <div style="width:44px;height:44px;border-radius:50%;background:#5a0f2a;color:#f3d58a;display:grid;place-items:center;font-weight:700;font-size:18px">${(user.name||'U')[0].toUpperCase()}</div>
+        <div>
+          <b style="font-size:16px;color:#5a0f2a;display:block">${esc(user.name)}</b>
+          <span style="font-size:13px;color:#666">${esc(user.email)}</span>
+        </div>
+      </div>
+      <p style="font-size:13px;color:#555;margin:0 0 14px">Your purchase order will be securely linked to this account for order history and tracking.</p>
+      <button type="button" class="btn" onclick="ck.step=1;route()">Continue to Delivery Address →</button>
+    </div>
+  ` : `
+    <div style="background:#fdf8f4;border:1.5px solid #ecd3a0;border-radius:12px;padding:18px;margin-bottom:16px">
+      <p style="margin:0 0 12px;font-size:14px">Have an account? <a href="#/login" style="color:var(--mag);font-weight:700">Login here</a> for faster checkout.</p>
+      <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Your Email Address (for order tracking & invoice updates)</label>
+      <input id="guest_email" type="email" placeholder="e.g. name@example.com" value="${esc(ck.addr.email||'')}" style="width:100%;margin-bottom:14px">
+      <button type="button" class="btn" onclick="const ge=($('#guest_email').value||'').trim();if(ge&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ge))return toast('Please enter a valid email address');ck.addr.email=ge;ck.step=1;route()">Continue as Guest →</button>
+    </div>
+  `;
+
+  const body1 = `
+    <div style="display:grid;gap:12px">
+      <div>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Full Name *</label>
+        <input id="a1" placeholder="Recipient's full name" value="${esc(ck.addr.n||(user&&user.name)||'')}" style="width:100%">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Mobile Phone Number (10 digits) *</label>
+        <input id="a2" inputmode="numeric" placeholder="10-digit mobile number" value="${esc(ck.addr.p||(user&&user.phone)||'')}" style="width:100%">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Street Address (House/Flat No, Area, Landmark) *</label>
+        <input id="a3" placeholder="House/Flat no, building, street, landmark" value="${esc(ck.addr.a||(user&&user.address)||'')}" style="width:100%">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">City / Town *</label>
+          <input id="a4_city" placeholder="City or Town" value="${esc(ck.addr.city||'')}" style="width:100%">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Postal Pincode (6 digits) *</label>
+          <input id="a4_pin" inputmode="numeric" placeholder="e.g. 642002" value="${esc(ck.addr.pin||'')}" style="width:100%">
+        </div>
+      </div>
+    </div>
+  `;
+
+  const body2 = `
+    <div style="display:grid;gap:12px">
+      <label style="display:flex;align-items:center;gap:14px;padding:16px;border:2px solid ${ck.delivery!='express'?'#5a0f2a':'#ecd3a0'};border-radius:12px;background:#fff;cursor:pointer">
+        <input type="radio" name="dm" ${ck.delivery!='express'?'checked':''} onchange="ck.delivery='standard';route()" style="width:auto;margin:0">
+        <div>
+          <b style="font-size:15px;display:block;color:#5a0f2a">Standard Delivery (3–5 Business Days)</b>
+          <small style="color:#666">${t.sub>=CFG.free?`FREE Shipping (Applied for order above ${inr(CFG.free)})`:`Delivery fee: ${inr(CFG.ship)}`}</small>
+        </div>
+      </label>
+      <label style="display:flex;align-items:center;gap:14px;padding:16px;border:2px solid ${ck.delivery=='express'?'#5a0f2a':'#ecd3a0'};border-radius:12px;background:#fff;cursor:pointer">
+        <input type="radio" name="dm" ${ck.delivery=='express'?'checked':''} onchange="ck.delivery='express';route()" style="width:auto;margin:0">
+        <div>
+          <b style="font-size:15px;display:block;color:#5a0f2a">Express Priority Delivery (1–2 Days) — +₹199</b>
+          <small style="color:#666">Priority courier dispatch with tamper-evident premium textile packaging</small>
+        </div>
+      </label>
+    </div>
+  `;
+
+  const body3 = `
+    <div style="display:grid;gap:14px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${['UPI','Cash on Delivery','Net Banking','Credit / Debit Card'].map(m=>`
+          <button type="button" class="btn ${ck.pay==m?'':'o'}" style="padding:8px 16px;font-size:13px;border-radius:20px" onclick="ck.pay='${m}';route()">${m==='UPI'?'⚡ UPI / QR Code':m}</button>
+        `).join('')}
+      </div>
+
+      ${ck.pay === 'UPI' ? `
+        <div style="background:#fff;border:1.5px solid #ecd3a0;border-radius:16px;padding:20px;box-shadow:0 8px 24px rgba(90,15,42,0.06)">
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:22px;align-items:center">
+            <div style="text-align:center">
+              <img src="/payment-qr.jpg" alt="ICICI Bank UPI QR Code - Gokila R" style="width:200px;max-width:100%;height:auto;border-radius:12px;border:1px solid #e0d0c5;box-shadow:0 4px 14px rgba(0,0,0,0.08);display:block;margin:0 auto">
+              <span style="font-size:11px;color:#777;display:block;margin-top:6px;font-weight:600">Scan to pay with any UPI app</span>
+            </div>
+            <div>
+              <div style="display:inline-block;background:#f5e6db;color:#5a0f2a;font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;letter-spacing:0.5px;margin-bottom:8px">OFFICIAL STORE UPI</div>
+              <h3 style="margin:0 0 4px;color:#5a0f2a;font-size:18px">GOKILA R</h3>
+              <p style="margin:0 0 10px;font-size:13px;color:#333">
+                UPI ID: <code style="background:#f3e8de;padding:3px 8px;border-radius:6px;font-weight:700;color:#5a0f2a;font-size:13px">gokilasandhanakrishnan@icici</code>
+                <button type="button" onclick="navigator.clipboard.writeText('gokilasandhanakrishnan@icici');toast('UPI ID copied ✓')" style="background:none;border:none;color:var(--mag);font-size:12px;cursor:pointer;text-decoration:underline;margin-left:6px;font-weight:600">Copy</button>
+              </p>
+              <div style="background:#fbf7f3;border-left:4px solid #5a0f2a;padding:10px 14px;border-radius:0 8px 8px 0;margin-bottom:12px">
+                <b style="font-size:18px;color:#5a0f2a;display:block">Payable: ${inr(t.total)}</b>
+                <small style="color:#666">Includes all sarees & delivery fees</small>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;font-size:11px;color:#666;flex-wrap:wrap">
+                <span>Apps:</span>
+                <b style="color:#222">Google Pay</b> · <b style="color:#222">PhonePe</b> · <b style="color:#222">Paytm</b> · <b style="color:#222">BHIM</b> · <b style="color:#222">iMobile</b>
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">UPI Transaction Reference / UTR Number (Optional)</label>
+                <input id="upi_ref" placeholder="Enter 12-digit UPI reference / UTR number" value="${esc(ck.pay_ref||'')}" oninput="ck.pay_ref=this.value.trim()" style="width:100%">
+                <small style="color:#777;display:block;margin-top:4px">Found in your payment app under transaction details</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      ` : ck.pay === 'Cash on Delivery' ? `
+        <div style="background:#fff;border:1.5px solid #ecd3a0;border-radius:12px;padding:18px">
+          <h4 style="margin:0 0 6px;color:#5a0f2a;font-size:16px">Cash on Delivery (COD)</h4>
+          <p style="font-size:13px;color:#555;margin:0 0 8px">Pay in cash when your parcel is delivered to your doorstep.</p>
+          <small style="color:#888">Our courier will contact you on your registered phone before delivery.</small>
+        </div>
+      ` : `
+        <div style="background:#fff;border:1.5px solid #ecd3a0;border-radius:12px;padding:18px">
+          <h4 style="margin:0 0 6px;color:#5a0f2a;font-size:16px">${ck.pay}</h4>
+          <p style="font-size:13px;color:#555;margin:0">Secure online payment will be confirmed upon order placement.</p>
+        </div>
+      `}
+    </div>
+  `;
+
+  const body4 = `
+    <div style="display:grid;gap:18px">
+      <div style="border-bottom:1px solid #ecd3a0;padding-bottom:12px">
+        <h4 style="margin:0 0 8px;color:#5a0f2a">Delivery Address</h4>
+        <p style="margin:0;font-size:14px"><b>${esc(ck.addr.n)}</b> · ${esc(ck.addr.p)}<br>${esc(ck.addr.a)}, ${esc(ck.addr.c)}</p>
+      </div>
+      <div style="border-bottom:1px solid #ecd3a0;padding-bottom:12px">
+        <h4 style="margin:0 0 8px;color:#5a0f2a">Delivery & Payment</h4>
+        <p style="margin:0;font-size:14px"><b>Speed:</b> ${ck.delivery=='express'?'Express Priority (1–2 Days)':'Standard (3–5 Days)'}<br><b>Payment:</b> ${esc(ck.pay)}${ck.pay_ref?` (Ref: <code>${esc(ck.pay_ref)}</code>)`:''}</p>
+      </div>
+      <div>
+        <h4 style="margin:0 0 8px;color:#5a0f2a">Order Items (${actItems.length})</h4>
+        <div style="display:grid;gap:8px">
+          ${actItems.map(i=>{
+            const p=find(i.id);
+            const name=p?p.name:(i.name||'Saree');
+            const price=p?effPr(p):(i.price||0);
+            return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px dashed #f0e0d5">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="width:40px;height:50px;border-radius:6px;overflow:hidden">${p?art(p,'front',i.col):''}</div>
+                <div><b style="font-size:13px">${esc(name)}</b><br><small style="color:#666">${esc(i.col)} · Qty ${i.q}</small></div>
+              </div>
+              <b>${inr(price*i.q)}</b>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+      <div style="background:#fdf8f4;padding:14px;border-radius:10px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span>Subtotal:</span><span>${inr(t.sub)}</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span>Discount saved:</span><span style="color:#0a7a4b">-${inr(t.save)}</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span>Delivery:</span><span>${t.del?inr(t.del):'FREE'}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;color:#5a0f2a;border-top:1px solid #ecd3a0;padding-top:8px;margin-top:6px">
+          <span>Total Payable:</span><span>${inr(t.total)}</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const body5 = `
+    <div style="text-align:center;padding:20px 0">
+      <div style="width:64px;height:64px;border-radius:50%;background:#0a7a4b;color:#fff;display:grid;place-items:center;font-size:32px;margin:0 auto 16px">✓</div>
+      <h3 style="color:#5a0f2a;font-size:24px;margin:0 0 8px">Order Confirmed!</h3>
+      <p style="font-size:15px;color:#444;margin:0 0 16px">Your purchase order <b>${esc(ck.oid)}</b> has been successfully placed.</p>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+        <a class="btn" href="#/order/${ck.oid}">Track this Order</a>
+        <a class="btn o" href="#/orders">My Orders</a>
+        <a class="btn o" href="#/c/sarees">Continue Shopping</a>
+      </div>
+    </div>
+  `;
+
+  const body=[body0,body1,body2,body3,body4,body5][ck.step];
+
+  return `
+    <div class="pg">
+      <h2>Checkout</h2>
+      <div class="steps" role="navigation" aria-label="Checkout steps">
+        ${S.map((s,i)=>`<span class="${i==ck.step?'on':''}">${i+1}. ${s}</span>`).join('')}
+      </div>
+      <div class="panel" style="max-width:680px;margin:0 auto">
+        ${body}
+        ${ck.step>0&&ck.step<5?`
+          <div style="margin-top:20px;display:flex;gap:10px;justify-content:space-between">
+            <button type="button" class="btn o" onclick="ck.step--;route()">← Back</button>
+            <button type="button" class="btn" onclick="nx()">${ck.step==4?`Place Order (${inr(t.total)})`:'Continue →'}</button>
+          </div>
+        `:''}
+      </div>
+    </div>
+  `;
+}
+function nx(){
+  if(ck.step==0){
+    const ge=$('#guest_email');
+    if(ge){
+      const val=ge.value.trim();
+      if(val&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val))return toast('Please enter a valid email address');
+      ck.addr.email=val;
+    }
+    ck.step=1;
+    route();
+    return;
+  }
+  if(ck.step==1){
+    const n=$('#a1').value.trim();
+    const p=($('#a2').value||'').replace(/\D/g,'').slice(-10);
+    const a=$('#a3').value.trim();
+    const city=($('#a4_city')?$('#a4_city').value.trim():'')||($('#a4')?$('#a4').value.trim():'');
+    const pin=($('#a4_pin')?$('#a4_pin').value.trim():'');
+    if(!n||!a||!city)return toast('Please fill in your name, delivery address and city');
+    if(p.length!=10)return toast('Enter a valid 10-digit mobile number');
+    ck.addr={n,p,a,city,pin,c:city+(pin?' - '+pin:'')};
+    ck.step=2;
+    route();
+    return;
+  }
+  if(ck.step==2){
+    ck.step=3;
+    route();
+    return;
+  }
+  if(ck.step==3){
+    const ur=$('#upi_ref');
+    if(ur)ck.pay_ref=ur.value.trim();
+    ck.step=4;
+    route();
+    return;
+  }
+  if(ck.step==4){
+    ck.oid='SKT'+Date.now().toString().slice(-7);
+    const its=cart.filter(i=>!i.later);
+    const orderData={
+      id:ck.oid,
+      items:its.map(i=>({...i})),
+      total:tt().total,
+      cost:its.reduce((acc,i)=>{const p=find(i.id);return acc+(p?(p.cost||Math.round(p.price*0.6)):1000)*i.q},0),
+      by:user?user.email:(ck.addr.email||'guest'),
+      name:ck.addr.n,
+      phone:ck.addr.p,
+      address:ck.addr.a+', '+ck.addr.c,
+      ship:tt().del,
+      pay:ck.pay,
+      pay_ref:ck.pay_ref||'',
+      date:new Date().toLocaleDateString('en-IN'),
+      iso:new Date().toISOString(),
+      status:'Processing',
+      tracking:'',
+      courier:'',
+      eta:'',
+      ev:[{s:'Processing',note:'Order placed',t:new Date().toISOString()}]
+    };
+    orders.unshift(orderData);
+    its.forEach(i=>{const p=find(i.id);if(p)svP(i.id,{stock:Math.max(0,p.stock-i.q)})});
+    ST('orders',orders);
+    cart=cart.filter(i=>i.later);
+    ST('cart',cart);
+    counts();
+    ck.step=5;
+    route();
+  }
+}
 /* AI try-on (mock) */
 let TO={img:null,pid:'SK1000',col:null};
 function tryon(pid,col){const hk=pid?pid+'/'+(col||''):'';if(hk&&hk!=TO.hk){TO.hk=hk;TO.pid=pid;TO.col=col||null;TO.done=0}const p=find(TO.pid)||find('SK1000');TO.pid=p.id;TO.col=TO.col||p.col;
@@ -385,11 +649,22 @@ ${TO.img?`<div class="ba" style="margin:16px 0"><div><img src="${TO.img}" alt="Y
 ${TO.done?`<p style="margin:14px 0"><small>Demo preview: a connected AI try-on API will replace this mock overlay in production.</small></p><div class="acts" style="flex-wrap:wrap"><button onclick="TO.done=0;location.hash='#/c/sarees'">Try Another Saree</button><button onclick="TO.done=0;route()">Change Colour</button><button onclick="TO.done=0;location.hash='#/c/lehengas'">Change Outfit</button><button onclick="toast('Preview downloaded (demo)')">Download Preview</button><button onclick="toast('Share link copied')">Share</button><button onclick="wl('${p.id}')">Add to Wishlist</button><button onclick="addCart('${p.id}','${TO.col}');location.hash='#/cart'">Buy Now</button></div>`:''}</div></div></div>`}
 const ADM={e:'admin@sreekrishna.demo',p:ST('admpw')||'admin123'};
 function addUser(u){const L=ST('users')||[];if(!L.some(x=>x.email==u.email)){L.push({name:u.name,email:u.email});ST('users',L)}}
+function renderRingSarees(){
+  const withImgs = P.filter(p=>p.img).slice(0,6);
+  if(withImgs.length >= 3){
+    const step = 360 / withImgs.length;
+    return withImgs.map((p,i)=>`<img src="${p.img.startsWith('/uploads')?(window.API_BASE||'')+p.img:p.img}" alt="${(p.name||'').replace(/"/g,'&quot;')}" style="--r:${i*step}deg" onerror="onImgErr(this,'${p.id}')">`).join('');
+  }
+  const sample = P.slice(0,6);
+  const items = sample.length ? sample : [{name:'Pure Kanchipuram Silk',price:3490},{name:'Banarasi Zari Brocade',price:2990},{name:'Mysore Royal Crepe',price:2190},{name:'Chettinad Handloom Cotton',price:1490},{name:'Mangalagiri Temple Border',price:1890},{name:'Designer Soft Tissue Silk',price:2690}];
+  const step = 360 / items.length;
+  return items.map((p,i)=>`<div class="ring-card" style="background:radial-gradient(circle at 30% 30%,#6a1230,#2a0814);--r:${i*step}deg"><svg viewBox="0 0 24 24" style="width:32px;height:32px;stroke:#c9a24a;fill:none;stroke-width:1.5;margin-bottom:8px"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg><b style="font-size:12px;line-height:1.2;color:#f3d58a;margin-bottom:4px">${(p.name||'Silk Saree').slice(0,22)}</b><span style="font-size:11px;color:#c9a24a;font-weight:600">${inr(p.price||1999)}</span></div>`).join('');
+}
 function auth(reg){
 if(user)return `<div class="pg"><div class="panel" style="max-width:480px"><h2>Already signed in</h2><p>You are signed in as <b>${esc(user.email)}</b>.</p><p style="margin-top:16px"><a class="btn" href="#/account">Go to My Account</a> <button class="btn o" onclick="logout();location.hash='#/'">Logout</button></p></div></div>`;
 const T=reg?['Join Sreekrishna','Create your account to save favourites, track orders and try sarees with AI.']:['Welcome back','Sign in to continue shopping, track your orders and try sarees with AI.'],
 PK=['Free delivery above ₹2,999','7-day easy returns','AI Virtual Try-On','Authentic handloom silks'];
-return `<div class="pg auth"><section class="stage" aria-label="Featured sarees"><p class="eyebrow">TRADITION MEETS ELEGANCE</p><h1 class="serif">${T[0]}</h1><p class="lead">${T[1]}</p><div class="scene" aria-hidden="true"><div class="ring">${(P.filter(p=>p.img).slice(0,6)).map((p,i)=>`<img src="${p.img.startsWith('/uploads')?(window.API_BASE||'')+p.img:p.img}" alt="${(p.name||'').replace(/"/g,'&quot;')}" style="--r:${i*60}deg">`).join('')||['#d6246e','#0f7a55','#1c4fa0','#6a0f2b','#6b2d8f','#c9a227'].map((c,i)=>`<span style="display:inline-block;width:90px;height:120px;border-radius:12px;background:${c};border:2px solid var(--gold);box-shadow:0 8px 24px #0006;--r:${i*60}deg"></span>`).join('')}</div></div><ul class="perks">${PK.map(x=>`<li>✦ ${x}</li>`).join('')}</ul></section>
+return `<div class="pg auth"><section class="stage" aria-label="Featured sarees"><p class="eyebrow">TRADITION MEETS ELEGANCE</p><h1 class="serif">${T[0]}</h1><p class="lead">${T[1]}</p><div class="scene" aria-hidden="true"><div class="ring">${renderRingSarees()}</div></div><ul class="perks">${PK.map(x=>`<li>✦ ${x}</li>`).join('')}</ul></section>
 <div class="panel authp"><h2>${reg?'Create customer account':'Login'}</h2>${reg?'<input id="n" aria-label="Name" placeholder="Name">':''}<input id="e" type="email" aria-label="Email" placeholder="Email"><input id="pw" type="password" aria-label="Password" placeholder="Password" onkeydown="if(event.key==='Enter')doAuth(${reg})">${!reg?'<p class="sub">Customers: log in, or register a new account.</p>':''}<button class="btn" onclick="doAuth(${reg})">${reg?'Create account':'Login'}</button><p style="margin-top:10px"><a href="#/${reg?'login':'register'}" style="color:var(--mag)">${reg?'Have an account? Login':'New customer? Register'}</a></p></div></div>`}
 function doAuth(reg){const e=$('#e').value.trim(),pw=$('#pw').value;if(!e)return toast('Enter email');if(!pw)return toast('Enter password');
 if(e.toLowerCase()==ADM.e)return toast('Invalid email or password');
@@ -397,7 +672,7 @@ user={name:($('#n')||{}).value||e.split('@')[0],email:e,role:'customer'};addUser
 ST('user',user);toast('Welcome, '+user.name);location.hash='#/account'}
 function adminAuth(){const T=['Admin Console','Manage prices, stock, pictures and orders, and see monthly sales, profit and loss.'],
 PK=['Edit prices, stock & pictures','Monthly profit & loss','Order management','Customer insights'];
-return `<div class="pg auth"><section class="stage" aria-label="Admin console"><p class="eyebrow">STORE MANAGEMENT</p><h1 class="serif">${T[0]}</h1><p class="lead">${T[1]}</p><div class="scene" aria-hidden="true"><div class="ring">${(P.filter(p=>p.img).slice(0,6)).map((p,i)=>`<img src="${p.img.startsWith('/uploads')?(window.API_BASE||'')+p.img:p.img}" alt="${(p.name||'').replace(/"/g,'&quot;')}" style="--r:${i*60}deg">`).join('')||['#d6246e','#0f7a55','#1c4fa0','#6a0f2b','#6b2d8f','#c9a227'].map((c,i)=>`<span style="display:inline-block;width:90px;height:120px;border-radius:12px;background:${c};border:2px solid var(--gold);box-shadow:0 8px 24px #0006;--r:${i*60}deg"></span>`).join('')}</div></div><ul class="perks">${PK.map(x=>`<li>✦ ${x}</li>`).join('')}</ul></section>
+return `<div class="pg auth"><section class="stage" aria-label="Admin console"><p class="eyebrow">STORE MANAGEMENT</p><h1 class="serif">${T[0]}</h1><p class="lead">${T[1]}</p><div class="scene" aria-hidden="true"><div class="ring">${renderRingSarees()}</div></div><ul class="perks">${PK.map(x=>`<li>✦ ${x}</li>`).join('')}</ul></section>
 <div class="panel authp"><h2>Admin Login</h2><p class="sub">Restricted area for store administrators.</p><input id="e" type="email" aria-label="Admin Email" placeholder="Admin Email" value="${!API?ADM.e:''}"><input id="pw" type="password" aria-label="Password" placeholder="Password" value="${!API?ADM.p:''}" onkeydown="if(event.key==='Enter')doAdminAuth()"><p class="sub">${API?'Use your admin email and password.':'Demo admin login is pre-filled: admin@sreekrishna.demo / admin123'}</p><button class="btn" onclick="doAdminAuth()">Login as Admin</button><p style="margin-top:14px"><a href="#/" style="color:var(--mag)">← Back to Store</a></p></div></div>`}
 function doAdminAuth(){const e=$('#e').value.trim(),pw=$('#pw').value;if(!e)return toast('Enter admin email');if(!pw)return toast('Enter password');
 if(e.toLowerCase()!=ADM.e||pw!=ADM.p)return toast('Invalid admin credentials');adminUnlocked=true;user={name:'Admin',email:ADM.e,role:'admin'};
@@ -411,7 +686,7 @@ if(cx)it.push(['Cancelled',at('Cancelled'),true,'x']);else STEPS.forEach((s,i)=>
 return `<ol class="tl" aria-label="Order progress">${it.map(([l,t,d,c])=>`<li class="${d?'done':''} ${c===true?'cur':''} ${c==='x'?'cx':''}"${c===true?' aria-current="step"':''}><b>${l}</b><small>${t||'Pending'}</small></li>`).join('')}</ol>`}
 function orderView(o,adm){const sub=o.total-(o.ship||0),canCx=!adm&&o.status=='Processing'&&(API?!!user:orders.some(x=>x.id==o.id));
 return `<div class="two ord"><div><div class="panel"><div class="bar"><h3 style="margin:0">Order ${o.id}</h3>${bdg(o.status)}<small>${fT(o.iso)||o.date}</small></div>${timeline(o)}${o.tracking?`<p><b>Courier:</b> ${esc(o.courier)||'-'} · <b>Tracking no:</b> <code>${esc(o.tracking)}</code>${o.eta?` · <b>Expected by:</b> ${new Date(o.eta).toLocaleDateString('en-IN',{dateStyle:'medium'})}`:''}</p>`:'<p class="sub">Tracking details appear here once your order ships.</p>'}</div>
-<div class="panel" style="margin-top:20px"><h3>Items</h3>${o.items.map(i=>{const p=find(i.id),pr=i.price||(p&&p.price)||0;return `<div class="row"><div class="t">${p?art(p,'front',i.col):''}</div><div class="g">${esc(p?p.name:i.name)} <small>(${esc(i.col)})</small><br><small>Qty ${i.q} × ${inr(pr)}</small></div><b>${inr(pr*i.q)}</b></div>`}).join('')}<p>Subtotal: ${inr(sub)}</p><p>Delivery: ${o.ship?inr(o.ship):'FREE'}</p><h3>Total ${inr(o.total)}</h3><p>Payment: ${esc(o.pay)}</p></div></div>
+<div class="panel" style="margin-top:20px"><h3>Items</h3>${o.items.map(i=>{const p=find(i.id),pr=i.price||(p&&p.price)||0;return `<div class="row"><div class="t">${p?art(p,'front',i.col):''}</div><div class="g">${esc(p?p.name:i.name)} <small>(${esc(i.col)})</small><br><small>Qty ${i.q} × ${inr(pr)}</small></div><b>${inr(pr*i.q)}</b></div>`}).join('')}<p>Subtotal: ${inr(sub)}</p><p>Delivery: ${o.ship?inr(o.ship):'FREE'}</p><h3>Total ${inr(o.total)}</h3><p>Payment: ${esc(o.pay)}${o.pay_ref?` · <b>Ref / UTR:</b> <code style="background:#f3e8de;padding:2px 6px;border-radius:4px;color:#5a0f2a">${esc(o.pay_ref)}</code>`:''}</p></div></div>
 <div><div class="panel"><h3>Delivery details</h3><p><b>${esc(o.name)||'-'}</b><br>${esc(o.address)||'-'}<br>Phone: ${esc(o.phone)||'-'}</p>${adm?`<p>Customer account: ${esc(o.by)}</p>`:''}</div>
 <div class="panel" style="margin-top:20px"><h3>Updates</h3><ul class="evs">${[...(o.ev||[])].reverse().map(e=>`<li><b>${e.s}</b> <small>${fT(e.t)}</small><br>${esc(e.note)}</li>`).join('')||'<li>No updates yet</li>'}</ul></div>
 <div class="acts noprint" style="margin-top:16px;flex-wrap:wrap"><button type="button" class="btn o" onclick="window.print()">Print invoice</button>${canCx?`<button type="button" class="btn o" onclick="cancelMine('${o.id}')">Cancel order</button>`:''}<a class="btn o" href="#/p/contact">Need help?</a></div></div></div>`}
@@ -430,11 +705,11 @@ const seenKey=()=>'seen_'+(user?user.email:'');
 function unread(){if(!user||user.role!='customer')return 0;const s=ST(seenKey())||'';return feed().filter(x=>x.e.t>s&&x.e.note!='Order placed').length}
 function account(){if(!user)return `<div class="pg"><h2>My Account</h2><div class="panel" style="max-width:520px"><p>Please <a href="#/login" style="color:var(--mag)">login</a> or <a href="#/register" style="color:var(--mag)">register</a>.</p><p style="margin-top:10px"><a href="#/track" style="color:var(--mag)">Track an order without logging in</a></p></div></div>`;
 const ad=user.role=='admin',F=feed().slice(0,12),seen=ST(seenKey())||'';setTimeout(()=>{if(user&&location.hash=='#/account'){ST(seenKey(),new Date().toISOString());roleUI()}},2500);
-return `<div class="pg"><h2>My Account</h2><div class="two"><div class="panel"><h3>Profile</h3><label for="pf1">Name</label><input id="pf1" value="${esc(user.name)}"><label for="pf0">Email</label><input id="pf0" value="${esc(user.email)}" disabled><label for="pf2">Phone</label><input id="pf2" inputmode="numeric" value="${esc(user.phone)}" placeholder="10-digit mobile number"><label for="pf3">Default delivery address</label><input id="pf3" value="${esc(user.address)}" placeholder="House, street, city, pincode"><button class="btn" onclick="saveProfile()">Save profile</button></div>
+return `<div class="pg"><h2>My Account</h2><div class="two"><div class="panel"><h3>Profile</h3><label for="pf1">Name</label><input id="pf1" value="${esc(user.name)}"><label for="pf0">Email address (Editable)</label><input id="pf0" type="email" value="${esc(user.email)}" placeholder="name@example.com"><label for="pf2">Phone</label><input id="pf2" inputmode="numeric" value="${esc(user.phone)}" placeholder="10-digit mobile number"><label for="pf3">Default delivery address</label><input id="pf3" value="${esc(user.address)}" placeholder="House, street, city, pincode"><button class="btn" onclick="saveProfile()">Save profile</button></div>
 <div class="panel"><h3>Change password</h3><input id="pw1" type="password" aria-label="Current password" placeholder="Current password"><input id="pw2" type="password" aria-label="New password" placeholder="New password (min 6 characters)"><button class="btn" onclick="changePw()">Update password</button></div></div>
 ${ad?'':`<div class="panel" style="margin-top:20px"><h3>Order updates</h3>${F.length?`<ul class="evs">${F.map(({o,e})=>`<li${e.t>seen&&e.note!='Order placed'?' class="new"':''}><a href="#/order/${o.id}" style="color:var(--mag)">${o.id}</a>: <b>${e.s}</b> <small>${fT(e.t)}</small><br>${esc(e.note)}</li>`).join('')}</ul>`:'<p>No updates yet. <a href="#/c/sarees" style="color:var(--mag)">Start shopping</a></p>'}<p><a class="btn" href="#/orders">My Orders</a></p></div>`}
 <p style="margin-top:16px"><button class="btn o" onclick="logout()">Logout</button></p></div>`}
-async function saveProfile(){const name=$('#pf1').value.trim(),raw=$('#pf2').value,phone=raw.replace(/\D/g,'').slice(-10),address=$('#pf3').value.trim();if(!name)return toast('Name is required');if(raw&&phone.length!=10)return toast('Enter a 10-digit phone number');try{if(API)user=await api('PUT','/me',{name,phone,address});else user={...user,name,phone,address};ST('user',user);toast('Profile saved ✓');route()}catch(e){toast(e.message)}}
+async function saveProfile(){const name=$('#pf1').value.trim(),email=($('#pf0').value||'').trim().toLowerCase(),raw=$('#pf2').value,phone=raw.replace(/\D/g,'').slice(-10),address=($('#pf3')?$('#pf3').value.trim():'')||(user&&user.address)||'';if(!name)return toast('Name is required');if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return toast('Please enter a valid email address');if(raw&&phone.length!=10)return toast('Enter a 10-digit phone number');try{if(API){const res=await api('PUT','/me',{name,email,phone,address});user=res.user||res;if(res.token){TOK=res.token;ST('tok',TOK)}}else user={...user,name,email,phone,address};ST('user',user);roleUI();toast('Profile saved successfully ✓');route()}catch(e){toast(e.message)}}
 async function changePw(){const c=$('#pw1').value,n=$('#pw2').value;if(n.length<6)return toast('New password must be at least 6 characters');try{if(API)await api('POST','/me/password',{current:c,new:n});else{if(user.role!='admin')throw new Error('Changing a customer password needs the live backend');if(c!=ADM.p)throw new Error('Current password is incorrect');ADM.p=n;ST('admpw',n)}toast('Password updated ✓');$('#pw1').value=$('#pw2').value=''}catch(e){toast(e.message)}}
 async function saveCfg(){const c={};for(const k of Object.keys(CFG)){const v=$('#cf_'+k).value.trim();if(typeof CFG[k]=='number')c[k]=Math.max(0,Math.round(+v||0));else{if(!v)return toast('Please fill in all store details');c[k]=v}}try{if(API)CFG=await api('PUT','/settings',c);else{CFG=c;ST('cfg',c)}toast('Settings saved ✓');route()}catch(e){toast(e.message)}}
 const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'],BASE=[205000,265000,355000,430000,395000,285000,240000,490000,640000,310000];
@@ -868,11 +1143,11 @@ function addProd(){
   $('#np1').focus();
 }
 function aOrd(){const q=oq.toLowerCase(),L2=allOrders().filter(o=>(!ofl||o.status==ofl)&&(!q||(o.id+(o.by||'')+(o.name||'')).toLowerCase().includes(q)));
-return `<div class="bar"><input type="text" id="oqi" aria-label="Search orders" placeholder="Search order ID or customer, press Enter" value="${esc(oq)}" onchange="oq=this.value;route()"><select aria-label="Filter by status" onchange="ofl=this.value;route()"><option value="">All statuses</option>${STS.map(x=>`<option ${x==ofl?'selected':''}>${x}</option>`).join('')}</select><small>${L2.length} orders${L2.length>300?' (showing 300)':''}</small></div><div style="overflow-x:auto"><table><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th></th></tr>${L2.slice(0,300).map(o=>`<tr><td>${o.id}${o.live?'':' <small>(sample)</small>'}</td><td>${o.date}</td><td>${esc(o.name||o.by||'guest')}<br><small>${esc(o.by||'')}</small></td><td>${o.items.reduce((a,i)=>a+i.q,0)}</td><td>${inr(o.total)}</td><td>${esc(o.pay)}</td><td>${bdg(o.status)}</td><td><a href="#/admin/order/${o.id}" style="color:var(--mag)">Manage</a></td></tr>`).join('')}</table></div>`}
+return `<div class="bar"><input type="text" id="oqi" aria-label="Search orders" placeholder="Search order ID or customer, press Enter" value="${esc(oq)}" onchange="oq=this.value;route()"><select aria-label="Filter by status" onchange="ofl=this.value;route()"><option value="">All statuses</option>${STS.map(x=>`<option ${x==ofl?'selected':''}>${x}</option>`).join('')}</select><small>${L2.length} orders${L2.length>300?' (showing 300)':''}</small></div><div style="overflow-x:auto"><table><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th></th></tr>${L2.slice(0,300).map(o=>`<tr><td>${o.id}${o.live?'':' <small>(sample)</small>'}</td><td>${o.date}</td><td>${esc(o.name||o.by||'guest')}<br><small>${esc(o.by||'')}</small></td><td>${o.items.reduce((a,i)=>a+i.q,0)}</td><td>${inr(o.total)}</td><td>${esc(o.pay)}${o.pay_ref?`<br><small style="color:var(--mag);font-weight:600">UTR: ${esc(o.pay_ref)}</small>`:''}</td><td>${bdg(o.status)}</td><td><a href="#/admin/order/${o.id}" style="color:var(--mag)">Manage</a></td></tr>`).join('')}</table></div>`}
 function aOrder(id){const o=allOrders().find(x=>x.id==id);if(!o)return '<p>Order not found. <a href="#/admin/orders" style="color:var(--mag)">Back to orders</a></p>';
 const form=o.live?`<div class="panel noprint" style="margin-bottom:20px"><h3>Update order</h3><div class="bar"><select id="os1" class="fx" aria-label="Status">${STS.map(x=>`<option ${x==o.status?'selected':''}>${x}</option>`).join('')}</select><input id="os2" class="fx" aria-label="Courier" placeholder="Courier (e.g. Delhivery)" value="${esc(o.courier)}"><input id="os3" class="fx" aria-label="Tracking number" placeholder="Tracking number" value="${esc(o.tracking)}"><input id="os4" class="fx" type="date" aria-label="Expected delivery date" value="${esc((o.eta||'').slice(0,10))}"></div><input id="os5" aria-label="Note shown to the customer" placeholder="Note shown to the customer (optional)"><button type="button" class="btn" onclick="saveOrder('${o.id}')">Save update</button></div>`:'<p class="sub">Sample order (read-only).</p>';
 return `<p class="noprint"><a href="#/admin/orders" style="color:var(--mag)">← All orders</a></p>${form}${orderView(o,true)}`}
-function aSet(){return `<div class="two"><div class="panel"><h3>Admin profile</h3><label for="pf1">Name</label><input id="pf1" value="${esc(user.name)}"><label for="pf0">Email</label><input id="pf0" disabled value="${esc(user.email)}"><label for="pf2">Phone</label><input id="pf2" inputmode="numeric" value="${esc(user.phone)}" placeholder="10-digit mobile number"><input type="hidden" id="pf3" value="${esc(user.address)}"><button class="btn" onclick="saveProfile()">Save profile</button><h3 style="margin-top:22px">Change password</h3><input id="pw1" type="password" aria-label="Current password" placeholder="Current password"><input id="pw2" type="password" aria-label="New password" placeholder="New password (min 6 characters)"><button class="btn" onclick="changePw()">Update password</button></div>
+function aSet(){return `<div class="two"><div class="panel"><h3>Admin profile</h3><label for="pf1">Name</label><input id="pf1" value="${esc(user.name)}"><label for="pf0">Email (Editable)</label><input id="pf0" type="email" value="${esc(user.email)}" placeholder="name@example.com"><label for="pf2">Phone</label><input id="pf2" inputmode="numeric" value="${esc(user.phone)}" placeholder="10-digit mobile number"><input type="hidden" id="pf3" value="${esc(user.address)}"><button class="btn" onclick="saveProfile()">Save profile</button><h3 style="margin-top:22px">Change password</h3><input id="pw1" type="password" aria-label="Current password" placeholder="Current password"><input id="pw2" type="password" aria-label="New password" placeholder="New password (min 6 characters)"><button class="btn" onclick="changePw()">Update password</button></div>
 <div class="panel"><h3>Store settings</h3>${[['store','Store name'],['phone','Contact phone'],['email','Contact email'],['addr','Store address'],['ship','Delivery fee (₹)'],['free','Free delivery above (₹)'],['low','Low-stock alert at (units)']].map(([k,l])=>`<label for="cf_${k}">${l}</label><input id="cf_${k}" ${typeof CFG[k]=='number'?'type="number" min="0"':''} value="${esc(CFG[k])}">`).join('')}<button class="btn" onclick="saveCfg()">Save settings</button><p class="sub">Delivery fee, free-delivery limit and low-stock level apply to the storefront, checkout and dashboard straight away.</p></div></div>`}
 function ordSt(id,v){const o=orders.find(x=>x.id==id);if(!o)return;const was=o.status=='Cancelled';if(v=='Cancelled'&&!was)o.items.forEach(i=>{const p=find(i.id);p&&svP(i.id,{stock:p.stock+i.q})});if(was&&v!='Cancelled')o.items.forEach(i=>{const p=find(i.id);p&&svP(i.id,{stock:Math.max(0,p.stock-i.q)})});o.status=v;ST('orders',orders);toast('Order updated ✓');route()}
 function aCus(){if(API)return `<div style="overflow-x:auto"><table><tr><th>Name</th><th>Email</th><th>Orders</th><th>Spent</th></tr>${(ADMC.customers||[]).map(c=>`<tr><td>${c.name}</td><td>${c.email}</td><td>${c.orders}</td><td>${inr(c.spent)}</td></tr>`).join('')}</table></div>`;const U=[...(ST('users')||[]),...['Priya Nair','Lakshmi Devi','Anita Rao','Meena S','Divya K'].map((name,i)=>({name,email:SE[i],demo:1}))];
@@ -908,7 +1183,7 @@ svP=(id,ch)=>{const p=find(id);if(!p)return;Object.assign(p,ch);if('price'in ch|
 admDel=id=>{if(!confirm('Delete this product?'))return;api('DELETE','/products/'+id).then(async()=>{toast('Product deleted from database ✓');await loadProducts();route()}).catch(e=>toast(e.message))};
 createProd=p=>api('POST','/products',p).then(async()=>{toast('Product saved to database ✓');await loadProducts();route()}).catch(e=>toast(e.message));
 ordSt=(id,v)=>api('PATCH','/orders/'+id+'/status',{status:v}).then(async()=>{await loadProducts();await loadOrders();toast('Order updated ✓');route()}).catch(e=>toast(e.message));
-const _nx=nx;nx=async function(){if(ck.step!=4)return _nx();const its=cart.filter(i=>!i.later);try{const o=await api('POST','/orders',{items:its.map(i=>({id:i.id,col:i.col,q:i.q})),name:ck.addr.n,phone:ck.addr.p,address:ck.addr.a+', '+ck.addr.c,email:user?user.email:'guest',pay:ck.pay});ck.oid=o.id;cart=cart.filter(i=>i.later);ST('cart',cart);await loadProducts();await loadOrders();if(!user)orders=[o];counts();ck.step++;route()}catch(e){toast(e.message)}};
+const _nx=nx;nx=async function(){if(ck.step!=4)return _nx();const ur=$('#upi_ref');if(ur)ck.pay_ref=ur.value.trim();const its=cart.filter(i=>!i.later);if(!its.length)return toast('Your cart is empty');try{const o=await api('POST','/orders',{items:its.map(i=>({id:i.id,col:i.col,q:i.q})),name:ck.addr.n,phone:ck.addr.p,address:ck.addr.a+', '+ck.addr.c,email:user?user.email:(ck.addr.email||'guest'),pay:ck.pay,pay_ref:ck.pay_ref||''});ck.oid=o.id;cart=cart.filter(i=>i.later);ST('cart',cart);await loadProducts();await loadOrders();orders=[o,...orders.filter(x=>x.id!=o.id)];counts();ck.step=5;route()}catch(e){toast(e.message)}};
 doAuth=async function(reg){const e=$('#e').value.trim(),pw=$('#pw').value;if(!e||!pw)return toast('Enter email and password');try{const r=await api('POST',reg?'/auth/register':'/auth/login',{name:($('#n')||{}).value||e.split('@')[0],email:e,password:pw,role:'customer'});TOK=r.token;ST('tok',TOK);user=r.user;ST('user',user);await loadProducts();await loadOrders();toast('Welcome, '+user.name);location.hash='#/account'}catch(er){toast(er.message)}};
 doAdminAuth=async function(){const e=$('#e').value.trim(),pw=$('#pw').value;if(!e||!pw)return toast('Enter email and password');try{const r=await api('POST','/auth/login',{email:e,password:pw,role:'admin'});TOK=r.token;ST('tok',TOK);user=r.user;ST('user',user);adminUnlocked=true;await loadProducts();await loadOrders();try{await loadAdmin()}catch(e){}toast('Welcome, '+user.name);route()}catch(er){toast(er.message)}}}
 async function initAPI(){
