@@ -812,6 +812,10 @@ app.get('/uploads/:filename/download', async (q, s) => {
 });
 app.get(['/admin', '/admin/*'], (q, s) => s.redirect('/#/admin'));
 app.get('/login', (q, s) => s.redirect('/#/login'));
+app.get('/favicon.ico', (q, s) => s.sendFile(path.join(__dirname, 'public', 'favicon.ico')));
+app.get('/favicon.svg', (q, s) => { s.type('image/svg+xml'); s.sendFile(path.join(__dirname, 'public', 'favicon.svg')); });
+app.get('/apple-touch-icon.png', (q, s) => s.sendFile(path.join(__dirname, 'public', 'apple-touch-icon.png')));
+app.get('/og-image.png', (q, s) => s.sendFile(path.join(__dirname, 'public', 'og-image.png')));
 app.use(express.static(path.join(__dirname, 'public')));
 
 async function startServer() {
