@@ -102,6 +102,7 @@ app.post('/api/auth/register/send-otp', limit, wrap(async (q, s) => {
   if (!name) throw err(400, 'Please enter your name');
   if (!EMAIL.test(email)) throw err(400, 'Please enter a valid email address');
   if (pw.length < 6) throw err(400, 'Password must be at least 6 characters');
+  if (q.body.confirm_password && q.body.confirm_password !== pw) throw err(400, 'Passwords do not match');
 
   if (await db.get('SELECT 1 FROM users WHERE email=?', [email])) {
     throw err(409, 'An account with this email already exists. Please log in.');
@@ -811,6 +812,10 @@ app.get('/uploads/:filename/download', async (q, s) => {
 });
 app.get(['/admin', '/admin/*'], (q, s) => s.redirect('/#/admin'));
 app.get('/login', (q, s) => s.redirect('/#/login'));
+app.get('/favicon.ico', (q, s) => s.sendFile(path.join(__dirname, 'public', 'favicon.ico')));
+app.get('/favicon.svg', (q, s) => { s.type('image/svg+xml'); s.sendFile(path.join(__dirname, 'public', 'favicon.svg')); });
+app.get('/apple-touch-icon.png', (q, s) => s.sendFile(path.join(__dirname, 'public', 'apple-touch-icon.png')));
+app.get('/og-image.png', (q, s) => s.sendFile(path.join(__dirname, 'public', 'og-image.png')));
 app.use(express.static(path.join(__dirname, 'public')));
 
 async function startServer() {
