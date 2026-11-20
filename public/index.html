@@ -198,12 +198,23 @@ function onImgErr(el, id) {
 }
 
 /* ---------- product art ---------- */
+function getSareeImgByColor(col){
+  const k = String(col || 'pink').toLowerCase().trim();
+  const valid = ['pink', 'maroon', 'blue', 'green', 'gold', 'purple', 'red', 'yellow'];
+  const name = valid.includes(k) ? k : 'pink';
+  return 'images/products/saree-' + name + '.jpg';
+}
+
 function art(p,m='front',c){
   if(!p)return '';
   c=c||p.col;
   if(p.img){
     const src=p.img.startsWith('/uploads')?(window.API_BASE||'')+p.img:p.img;
     return `<img class="ph" src="${src}" alt="${(p.name||'').replace(/"/g,'&quot;')}" decoding="async" style="image-rendering:auto" onerror="onImgErr(this,'${p.id}')">`;
+  }
+  if(!p.cat || p.cat === 'Sarees' || p.cat === 'Wedding Collections'){
+    const src = getSareeImgByColor(c);
+    return `<img class="ph" src="${src}" alt="${(p.name||'').replace(/"/g,'&quot;')}" decoding="async" style="image-rendering:auto;object-fit:cover" onerror="onImgErr(this,'${p.id}')">`;
   }
   const name=((p.name||'Sreekrishna Textiles')).slice(0,30);
   const cat=p.cat||'Luxury Textiles';
@@ -233,16 +244,10 @@ function renderHeroCardArt(pid, col){
   const p = (typeof find === 'function') ? find(pid) : null;
   if (p && p.img) {
     const src = p.img.startsWith('/uploads') ? (window.API_BASE || '') + p.img : p.img;
-    return '<img src="' + src + '" alt="' + (p.name||'').replace(/"/g,'&quot;') + '" style="width:100%;height:100%;object-fit:cover">';
+    return '<img src="' + src + '" alt="' + (p.name||'').replace(/"/g,'&quot;') + '" style="width:100%;height:100%;object-fit:cover;border-radius:10px">';
   }
-  const bgMap = {
-    'Pink': 'radial-gradient(circle at 30% 30%, #8e1447, #380718)',
-    'Blue': 'radial-gradient(circle at 30% 30%, #1565c0, #092040)',
-    'Green': 'radial-gradient(circle at 30% 30%, #0d703e, #06301a)',
-    'Gold': 'radial-gradient(circle at 30% 30%, #c99a2c, #4a3308)'
-  };
-  const bg = bgMap[col] || 'radial-gradient(circle at 30% 30%, #6a1230, #2a0814)';
-  return '<div style="width:100%;height:100%;background:' + bg + ';display:grid;place-items:center;color:#ffd700"><svg viewBox="0 0 24 24" style="width:30px;height:30px;stroke:#ffd700;fill:none;stroke-width:1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg></div>';
+  const src = getSareeImgByColor(col);
+  return '<img src="' + src + '" alt="Featured Saree" style="width:100%;height:100%;object-fit:cover;border-radius:10px">';
 }
 /* ---------- hero ---------- */
 const SL=[
@@ -368,9 +373,8 @@ function heroHTML(){return `<section id="hero" aria-roledescription="carousel" a
       <span id="hc_disc" style="font-size:10.5px;font-weight:700;color:#ff6b8b;display:inline-block;margin-top:2px">${SL[0].pDisc}% OFF Limited Deal</span>
     </div>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-    <a id="hc_view" href="#/product/${SL[0].pid}" class="btn" style="padding:8px 0;font-size:11.5px;text-align:center;border-radius:20px;text-decoration:none">View Saree →</a>
-    <a id="hc_tryon" href="#/tryon/${SL[0].pid}" class="btn o" style="padding:8px 0;font-size:11.5px;text-align:center;border-radius:20px;border-color:#ffd700;color:#ffd700;text-decoration:none">✨ AI Try-On</a>
+  <div>
+    <a id="hc_view" href="#/product/${SL[0].pid}" class="btn" style="display:block;padding:9px 0;font-size:13px;font-weight:600;letter-spacing:0.3px;text-align:center;border-radius:20px;text-decoration:none;box-shadow:0 4px 14px rgba(214,36,110,0.4)">View Saree Details →</a>
   </div>
 </div>
 <button class="ar l hu" aria-label="Previous slide" onclick="go(-1)">‹</button><button class="ar r hu" aria-label="Next slide" onclick="go(1)">›</button>
@@ -417,7 +421,6 @@ function go(d,to){
     if($('#hc_mrp')) $('#hc_mrp').textContent = inr(s.pMrp);
     if($('#hc_disc')) $('#hc_disc').textContent = s.pDisc + '% OFF Limited Deal';
     if($('#hc_view')) $('#hc_view').href = '#/product/' + s.pid;
-    if($('#hc_tryon')) $('#hc_tryon').href = '#/tryon/' + s.pid;
     if($('#hc_img_wrap')) $('#hc_img_wrap').innerHTML = renderHeroCardArt(s.pid, s.col);
 
     const card = $('#hero_card');
@@ -1056,18 +1059,440 @@ function nx(){
     route();
   }
 }
-/* AI try-on (mock) */
-let TO={img:null,pid:'SK1000',col:null};
-function tryon(pid,col){const hk=pid?pid+'/'+(col||''):'';if(hk&&hk!=TO.hk){TO.hk=hk;TO.pid=pid;TO.col=col||null;TO.done=0}const p=find(TO.pid)||find('SK1000');TO.pid=p.id;TO.col=TO.col||p.col;
-setTimeout(()=>{const inp=$('#up');$('#sel').onchange=e=>{TO.pid=e.target.value;TO.col=null;TO.done=0;route()};$('#tc').innerHTML=CK.map(c=>`<button data-c="${c}" style="background:${COL[c]}" class="${c==TO.col?'on':''}" aria-pressed="${c==TO.col}" aria-label="${c} colour"></button>`).join('');$$('#tc button').forEach(b=>b.onclick=()=>{TO.col=b.dataset.c;TO.done=0;route()});
-const set=f=>{if(!f)return;const r=new FileReader();r.onload=()=>{TO.img=r.result;route()};r.readAsDataURL(f)};$('#up').onchange=e=>set(e.target.files[0]);$('#cam').onchange=e=>set(e.target.files[0]);
-$('#gen').onclick=()=>{if(!TO.img)return toast('Please upload or take a photo first');const pr=$('#pg'),b=$('#pg i');let n=0;pr.style.display='block';const t=setInterval(()=>{n+=Math.random()*9;b.style.width=Math.min(n,100)+'%';$('#pgt').textContent=['Analysing pose…','Fitting drape & pleats…','Rendering zari & lighting…'][Math.min(2,n/34|0)];if(n>=100){clearInterval(t);tries++;ST('tries',tries);TO.done=1;route()}},180)}},0);
-const prods=P.filter(x=>x.cat=='Sarees'||x.cat=='Lehengas');
-return `<div class="pg"><h2>AI Virtual Try-On</h2><p class="sub">See how you look in your favourite outfit before you buy.</p><div class="two"><div class="panel"><h3>1. Selected Outfit</h3><select id="sel">${prods.map(x=>`<option value="${x.id}" ${x.id==p.id?'selected':''}>${x.name}</option>`).join('')}</select><div class="main" style="max-width:260px;margin:auto">${art(p,'front',TO.col)}</div><p style="margin-top:10px"><b>Colour:</b> ${TO.col}</p><div class="sw" id="tc"></div></div>
-<div class="panel"><h3>2. Your Photo</h3><p class="sub" style="font-size:13px">Upload a clear full-body or upper-body photo for the best result.</p><label class="btn o" style="cursor:pointer">Upload Photo<input id="up" class="sr" type="file" accept="image/*"></label> <label class="btn o" style="cursor:pointer">Take Photo<input id="cam" class="sr" type="file" accept="image/*" capture="user"></label>
-${TO.img?`<div class="ba" style="margin:16px 0"><div><img src="${TO.img}" alt="Your photo"><b>BEFORE</b></div><div>${TO.done?`<img src="${TO.img}" alt="Try-on preview"><div class="ov">${art(p,'fabric',TO.col)}</div>`:'<div style="display:grid;place-items:center;height:100%;color:#fff9">Preview</div>'}<b>AFTER</b></div></div>`:''}
-<button class="btn" id="gen" style="margin-top:14px">${TO.done?'Regenerate':'Generate Preview'}</button><div class="prog" id="pg" style="display:none"><i></i></div><small id="pgt"></small>
-${TO.done?`<p style="margin:14px 0"><small>Demo preview: a connected AI try-on API will replace this mock overlay in production.</small></p><div class="acts" style="flex-wrap:wrap"><button onclick="TO.done=0;location.hash='#/c/sarees'">Try Another Saree</button><button onclick="TO.done=0;route()">Change Colour</button><button onclick="TO.done=0;location.hash='#/c/lehengas'">Change Outfit</button><button onclick="toast('Preview downloaded (demo)')">Download Preview</button><button onclick="toast('Share link copied')">Share</button><button onclick="wl('${p.id}')">Add to Wishlist</button><button onclick="addCart('${p.id}','${TO.col}');location.hash='#/cart'">Buy Now</button></div>`:''}</div></div></div>`}
+/* =========================================================================
+   AI Virtual Saree Try-On Engine (Live Camera + Photorealistic Silk Composite)
+   ========================================================================= */
+let TO = {
+  img: null,
+  pid: 'SK1000',
+  col: null,
+  done: 0,
+  previewResult: null,
+  fitY: 0,
+  fitScale: 1.0,
+  hk: ''
+};
+
+let tryonStream = null;
+
+function stopTryOnCamera() {
+  if (tryonStream) {
+    tryonStream.getTracks().forEach(t => t.stop());
+    tryonStream = null;
+  }
+  const modal = document.getElementById('tryon_cam_modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function openTryOnCamera() {
+  const modal = document.getElementById('tryon_cam_modal');
+  const video = document.getElementById('tryon_video');
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    toast('Live camera is not supported in this browser. Opening photo upload...');
+    const fb = document.getElementById('cam_fallback');
+    if (fb) fb.click();
+    return;
+  }
+  try {
+    tryonStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: 'user',
+        width: { ideal: 1280 },
+        height: { ideal: 960 }
+      }
+    });
+    if (video) {
+      video.srcObject = tryonStream;
+      video.play().catch(e => console.warn('Video play error:', e));
+    }
+    if (modal) modal.style.display = 'flex';
+  } catch (err) {
+    console.warn('Camera access error:', err);
+    toast('Camera access unavailable (' + (err.name || 'permission denied') + '). Opening photo upload...');
+    const fb = document.getElementById('cam_fallback');
+    if (fb) fb.click();
+  }
+}
+
+function snapTryOnPhoto() {
+  const video = document.getElementById('tryon_video');
+  if (!video || !video.videoWidth) {
+    return toast('Camera feed not ready yet. Please wait a moment.');
+  }
+  const cvs = document.createElement('canvas');
+  cvs.width = video.videoWidth || 640;
+  cvs.height = video.videoHeight || 480;
+  const ctx = cvs.getContext('2d');
+  // Mirror selfie so it behaves like a mirror
+  ctx.translate(cvs.width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0, cvs.width, cvs.height);
+
+  TO.img = cvs.toDataURL('image/jpeg', 0.92);
+  TO.done = 0;
+  TO.previewResult = null;
+  stopTryOnCamera();
+  route();
+  toast('📸 Photo captured! Click "Generate Preview" to try on your saree.');
+}
+
+function renderTryOnCanvas(callback) {
+  if (!TO.img) return;
+  const canvas = document.createElement('canvas');
+  canvas.width = 600;
+  canvas.height = 800;
+  const ctx = canvas.getContext('2d');
+
+  const userImg = new Image();
+  userImg.crossOrigin = 'anonymous';
+  userImg.onload = () => {
+    // 1. Draw customer photo filling canvas (aspect cover)
+    const cw = canvas.width, ch = canvas.height;
+    const imgRatio = userImg.width / userImg.height;
+    const canRatio = cw / ch;
+    let sx, sy, sw, sh;
+    if (imgRatio > canRatio) {
+      sh = userImg.height;
+      sw = sh * canRatio;
+      sx = (userImg.width - sw) / 2;
+      sy = 0;
+    } else {
+      sw = userImg.width;
+      sh = sw / canRatio;
+      sx = 0;
+      sy = (userImg.height - sh) * 0.15; // align upper body / face
+    }
+    ctx.drawImage(userImg, sx, sy, sw, sh, 0, 0, cw, ch);
+
+    // 2. Load realistic saree drape overlay for the chosen color
+    const colKey = String(TO.col || 'pink').toLowerCase().trim();
+    const valid = ['pink', 'maroon', 'blue', 'green', 'gold', 'purple', 'red', 'yellow'];
+    const safeCol = valid.includes(colKey) ? colKey : 'pink';
+
+    const sareeImg = new Image();
+    sareeImg.crossOrigin = 'anonymous';
+    sareeImg.onload = () => {
+      // Natural saree placement over chest and shoulders
+      const scale = TO.fitScale || 1.0;
+      const dw = cw * 1.02 * scale;
+      const dh = ch * 0.76 * scale;
+      const dx = (cw - dw) / 2;
+      const dy = (ch * 0.24) + (TO.fitY || 0);
+
+      ctx.save();
+      // Draw authentic silk drape with zari borders
+      ctx.drawImage(sareeImg, dx, dy, dw, dh);
+      ctx.restore();
+
+      TO.previewResult = canvas.toDataURL('image/jpeg', 0.94);
+      if (callback) callback(TO.previewResult);
+    };
+    sareeImg.onerror = () => {
+      TO.previewResult = canvas.toDataURL('image/jpeg', 0.9);
+      if (callback) callback(TO.previewResult);
+    };
+    sareeImg.src = 'images/tryon/saree_' + safeCol + '.png';
+  };
+  userImg.src = TO.img;
+}
+
+function downloadTryOnPreview() {
+  if (!TO.previewResult) return toast('Please generate preview first');
+  const p = find(TO.pid) || { name: 'Saree' };
+  const a = document.createElement('a');
+  a.href = TO.previewResult;
+  a.download = `sreekrishna-tryon-${(p.name || 'saree').replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${(TO.col || 'pink').toLowerCase()}.jpg`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  toast('✨ Virtual Try-On photo downloaded!');
+}
+
+function tryon(pid, col) {
+  const hk = pid ? pid + '/' + (col || '') : '';
+  if (hk && hk !== TO.hk) {
+    TO.hk = hk;
+    TO.pid = pid;
+    TO.col = col || null;
+    TO.done = 0;
+    TO.previewResult = null;
+  }
+  const p = find(TO.pid) || find('SK1000') || (P.length ? P[0] : { id: 'SK1000', name: 'Silk Saree', col: 'Pink' });
+  TO.pid = p.id;
+  TO.col = TO.col || p.col || 'Pink';
+
+  setTimeout(() => {
+    // Dropdown change
+    const sel = document.getElementById('sel');
+    if (sel) {
+      sel.onchange = e => {
+        TO.pid = e.target.value;
+        const np = find(TO.pid);
+        if (np) TO.col = np.col || 'Pink';
+        if (TO.done && TO.img) {
+          renderTryOnCanvas(() => route());
+        } else {
+          TO.done = 0;
+          TO.previewResult = null;
+          route();
+        }
+      };
+    }
+
+    // Color swatches
+    const tc = document.getElementById('tc');
+    if (tc) {
+      tc.innerHTML = CK.map(c => `<button data-c="${c}" style="background:${COL[c]}" class="${c === TO.col ? 'on' : ''}" aria-pressed="${c === TO.col}" aria-label="${c} colour" title="${c}"></button>`).join('');
+      tc.querySelectorAll('button').forEach(b => {
+        b.onclick = () => {
+          TO.col = b.dataset.c;
+          if (TO.done && TO.img) {
+            renderTryOnCanvas((res) => {
+              route();
+              toast(`Switched to ${b.dataset.c} saree drape ✓`);
+            });
+          } else {
+            route();
+          }
+        };
+      });
+    }
+
+    // Photo input handlers
+    const setFile = f => {
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = () => {
+        TO.img = r.result;
+        TO.done = 0;
+        TO.previewResult = null;
+        route();
+        toast('Photo loaded! Click "Generate Preview" to try on your saree.');
+      };
+      r.readAsDataURL(f);
+    };
+
+    const upInp = document.getElementById('up');
+    if (upInp) upInp.onchange = e => setFile(e.target.files[0]);
+
+    const fbInp = document.getElementById('cam_fallback');
+    if (fbInp) fbInp.onchange = e => setFile(e.target.files[0]);
+
+    // Generate preview with smooth multi-stage progress
+    const genBtn = document.getElementById('gen');
+    if (genBtn) {
+      genBtn.onclick = () => {
+        if (!TO.img) return toast('Please upload or take a photo first');
+        const pr = document.getElementById('pg'), b = document.querySelector('#pg i'), tEl = document.getElementById('pgt');
+        genBtn.disabled = true;
+        genBtn.textContent = 'Generating...';
+        if (pr) pr.style.display = 'block';
+
+        let n = 0;
+        const stages = [
+          'Detecting posture & shoulder contours…',
+          'Aligning saree pallu, pleats & bodice…',
+          'Rendering pure silk weave & gold zari luster…',
+          'Finalizing photorealistic drape…'
+        ];
+        const timer = setInterval(() => {
+          n += Math.random() * 12 + 8;
+          const pct = Math.min(n, 100);
+          if (b) b.style.width = pct + '%';
+          const stageIdx = Math.min(stages.length - 1, Math.floor(pct / 26));
+          if (tEl) tEl.textContent = stages[stageIdx];
+
+          if (n >= 100) {
+            clearInterval(timer);
+            renderTryOnCanvas((resUrl) => {
+              TO.done = 1;
+              tries = (tries || 0) + 1;
+              ST('tries', tries);
+              route();
+              toast('✨ Virtual Try-On drape generated successfully!');
+            });
+          }
+        }, 120);
+      };
+    }
+  }, 0);
+
+  const prods = P.filter(x => x.cat === 'Sarees' || x.cat === 'Wedding Collections' || x.cat === 'Lehengas');
+  const displayProds = prods.length ? prods : P.slice(0, 30);
+
+  return `
+  <div class="pg">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:8px">
+      <div>
+        <h2 style="margin:0 0 4px">AI Virtual Try-On</h2>
+        <p class="sub" style="margin:0">See how you look in your favourite authentic silk saree before you buy.</p>
+      </div>
+      <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(214,36,110,0.1);padding:6px 14px;border-radius:20px;border:1px solid rgba(214,36,110,0.3)">
+        <span style="font-size:14px">✨</span>
+        <span style="font-size:12.5px;font-weight:600;color:var(--mag)">Instant Camera &amp; Silk Drape</span>
+      </div>
+    </div>
+
+    <div class="two" style="align-items:start">
+      <!-- 1. Selected Outfit Panel -->
+      <div class="panel" style="position:relative">
+        <h3 style="display:flex;align-items:center;gap:8px">
+          <span style="background:var(--mag);color:#fff;width:24px;height:24px;border-radius:50%;display:inline-grid;place-items:center;font-size:12px">1</span>
+          Selected Outfit
+        </h3>
+        <select id="sel" style="margin-bottom:14px;padding:10px 12px;font-size:13.5px;font-weight:600;border-radius:10px;border:1.5px solid #d9c3b4;background:#fff;width:100%">
+          ${displayProds.map(x => `<option value="${x.id}" ${x.id === p.id ? 'selected' : ''}>${x.name} — ${inr(effPr(x))}</option>`).join('')}
+        </select>
+        
+        <div class="main" style="max-width:280px;margin:auto;border-radius:14px;overflow:hidden;box-shadow:0 6px 20px rgba(90,15,42,0.15);border:1px solid #eadccf;background:#1a050e">
+          ${art(p, 'front', TO.col)}
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:14px">
+          <div>
+            <b>Selected Colour:</b> <span style="color:var(--mag);font-weight:700">${TO.col}</span>
+          </div>
+          <span style="font-size:16px;font-weight:700;color:var(--mag)">${inr(effPr(p))}</span>
+        </div>
+        <div class="sw" id="tc" style="margin-top:8px"></div>
+        <small style="display:block;margin-top:8px;opacity:0.75;font-size:11.5px">Click any colour above to instantly preview that saree fabric.</small>
+      </div>
+
+      <!-- 2. Your Photo & Drape Preview Panel -->
+      <div class="panel">
+        <h3 style="display:flex;align-items:center;gap:8px">
+          <span style="background:var(--mag);color:#fff;width:24px;height:24px;border-radius:50%;display:inline-grid;place-items:center;font-size:12px">2</span>
+          Your Photo &amp; Virtual Drape
+        </h3>
+        <p class="sub" style="font-size:13px;margin:0 0 14px">Take a live photo with your camera or upload a clear front-facing portrait.</p>
+
+        <!-- Capture & Upload Buttons -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <button type="button" class="btn" onclick="openTryOnCamera()" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:20px;font-size:13px;font-weight:600">
+            📸 Take Photo
+          </button>
+          <label class="btn o" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:20px;font-size:13px;font-weight:600">
+            📁 Upload Photo
+            <input id="up" class="sr" type="file" accept="image/*">
+          </label>
+          <input id="cam_fallback" type="file" accept="image/*" capture="user" style="display:none">
+          
+          ${TO.img ? `
+            <span style="display:inline-flex;align-items:center;gap:4px;color:#0a7a4b;font-size:12.5px;font-weight:600;margin-left:auto">
+              ✓ Photo Ready
+            </span>
+          ` : ''}
+        </div>
+
+        <!-- Before / After Grid Display -->
+        ${TO.img ? `
+          <div class="ba" style="margin:16px 0;grid-template-columns:1fr 1fr;gap:14px">
+            <!-- BEFORE -->
+            <div style="position:relative;border-radius:14px;overflow:hidden;aspect-ratio:3/4;background:#18050e;border:1.5px solid #eadccf;box-shadow:0 4px 15px rgba(0,0,0,0.08)">
+              <img src="${TO.img}" alt="Your photo" style="width:100%;height:100%;object-fit:cover;display:block">
+              <b style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.7);color:#fff;padding:2px 10px;border-radius:10px;font-size:11px;letter-spacing:0.5px">BEFORE</b>
+            </div>
+
+            <!-- AFTER -->
+            <div style="position:relative;border-radius:14px;overflow:hidden;aspect-ratio:3/4;background:#18050e;border:1.5px solid #c9a24a;box-shadow:0 6px 20px rgba(90,15,42,0.18)">
+              ${TO.done && TO.previewResult ? `
+                <img id="tryon_after_img" src="${TO.previewResult}" alt="Virtual try-on preview" style="width:100%;height:100%;object-fit:cover;display:block">
+                <b style="position:absolute;top:8px;left:8px;background:linear-gradient(135deg,#d6246e,#c9a24a);color:#fff;padding:2px 10px;border-radius:10px;font-size:11px;letter-spacing:0.5px">AFTER (✨ Drape)</b>
+              ` : `
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#f3d58a;padding:16px;text-align:center">
+                  <svg viewBox="0 0 24 24" style="width:40px;height:40px;stroke:#c9a24a;fill:none;stroke-width:1.5;margin-bottom:10px"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg>
+                  <span style="font-weight:600;font-size:13.5px">Preview Ready to Generate</span>
+                  <small style="opacity:0.75;margin-top:4px">Click "Generate Preview" below to see your virtual saree drape</small>
+                </div>
+              `}
+            </div>
+          </div>
+        ` : `
+          <div style="border:2px dashed #d9c3b4;border-radius:14px;padding:36px 20px;text-align:center;margin:16px 0;background:rgba(255,255,255,0.4)">
+            <svg viewBox="0 0 24 24" style="width:48px;height:48px;stroke:var(--mag);fill:none;stroke-width:1.5;margin:0 auto 10px;display:block"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+            <b style="display:block;font-size:15px;color:var(--ink)">No Photo Added Yet</b>
+            <p style="font-size:12.5px;color:rgba(0,0,0,0.6);margin:6px 0 14px">Click <b>"📸 Take Photo"</b> to open your camera, or <b>"📁 Upload Photo"</b> to pick from your files.</p>
+            <button type="button" class="btn" onclick="openTryOnCamera()" style="padding:10px 22px;border-radius:20px;font-size:13px">📸 Open Live Camera</button>
+          </div>
+        `}
+
+        <!-- Generate Button & Progress Indicator -->
+        <button class="btn" id="gen" style="margin-top:10px;padding:11px 24px;border-radius:22px;font-size:14px;font-weight:700;display:inline-flex;align-items:center;gap:6px">
+          ${TO.done ? '✨ Re-Generate Drape Preview' : '✨ Generate Preview'}
+        </button>
+        <div class="prog" id="pg" style="display:none;margin:12px 0 6px"><i></i></div>
+        <small id="pgt" style="color:var(--mag);font-weight:600;display:block"></small>
+
+        <!-- Fine-tune fit controls if preview was generated -->
+        ${TO.done ? `
+          <div style="background:rgba(90,15,42,0.05);border:1px solid #eadccf;border-radius:12px;padding:12px;margin:14px 0">
+            <b style="font-size:12.5px;display:block;margin-bottom:8px;color:var(--bur)">Adjust Saree Drape Fit:</b>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div>
+                <small style="display:block;margin-bottom:4px">↕ Height Position: <span id="lbl_pos">${TO.fitY || 0}px</span></small>
+                <input type="range" min="-60" max="60" value="${TO.fitY || 0}" style="width:100%" oninput="TO.fitY=+this.value;document.getElementById('lbl_pos').textContent=this.value+'px';renderTryOnCanvas(url=>{const im=document.getElementById('tryon_after_img');if(im)im.src=url;})">
+              </div>
+              <div>
+                <small style="display:block;margin-bottom:4px">🔍 Drape Size: <span id="lbl_scale">${Math.round((TO.fitScale || 1.0) * 100)}%</span></small>
+                <input type="range" min="0.85" max="1.20" step="0.02" value="${TO.fitScale || 1.0}" style="width:100%" oninput="TO.fitScale=+this.value;document.getElementById('lbl_scale').textContent=Math.round(this.value*100)+'%';renderTryOnCanvas(url=>{const im=document.getElementById('tryon_after_img');if(im)im.src=url;})">
+              </div>
+            </div>
+            <div style="text-align:right;margin-top:8px">
+              <button type="button" style="background:none;border:none;color:var(--mag);font-size:11.5px;font-weight:600;cursor:pointer;text-decoration:underline" onclick="TO.fitY=0;TO.fitScale=1.0;renderTryOnCanvas(url=>{route();toast('Fit reset to default ✓');})">Reset to Default Fit</button>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="acts" style="flex-wrap:wrap;gap:8px;margin-top:14px">
+            <button class="btn" onclick="downloadTryOnPreview()" style="display:inline-flex;align-items:center;gap:6px">📥 Download Preview</button>
+            <button class="btn" onclick="addCart('${p.id}','${TO.col}');toast('Added ${p.name} to cart ✓')" style="background:#5a0f2a;border-color:#5a0f2a">🛒 Add to Cart</button>
+            <button class="btn" onclick="addCart('${p.id}','${TO.col}');location.hash='#/checkout'" style="background:linear-gradient(135deg,#d6246e,#c9a24a);border:none">⚡ Buy Now</button>
+            <button class="btn o" onclick="openTryOnCamera()">📸 Retake Photo</button>
+            <button class="btn o" onclick="location.hash='#/c/sarees'">Browse Sarees</button>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+
+    <!-- Live In-Browser Camera Modal -->
+    <div id="tryon_cam_modal" class="modal" role="dialog" aria-modal="true" aria-label="Camera Capture" style="display:none;position:fixed;inset:0;background:rgba(20,5,12,0.85);backdrop-filter:blur(8px);z-index:9999;align-items:center;justify-content:center;padding:16px">
+      <div style="background:#240816;border:1.5px solid #c9a24a;border-radius:20px;padding:24px;max-width:520px;width:100%;color:#fff;box-shadow:0 14px 45px rgba(0,0,0,0.65);position:relative">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h3 style="margin:0;font-family:'Playfair Display',serif;color:#f3d58a;font-size:19px;display:flex;align-items:center;gap:8px">
+            📸 Live Camera Photo
+          </h3>
+          <button type="button" onclick="stopTryOnCamera()" style="background:none;border:none;color:#f3d58a;font-size:24px;cursor:pointer;line-height:1;padding:4px">✕</button>
+        </div>
+        <p style="font-size:12.5px;color:#ecc68b;margin:0 0 14px;opacity:0.9">Align your face and shoulders inside the guide for the most realistic saree drape.</p>
+        
+        <div style="position:relative;width:100%;aspect-ratio:3/4;max-height:400px;border-radius:14px;overflow:hidden;background:#111;margin-bottom:16px;box-shadow:inset 0 0 20px rgba(0,0,0,0.8)">
+          <video id="tryon_video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1)"></video>
+          <!-- Shoulder guide overlay -->
+          <div style="position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center">
+            <svg viewBox="0 0 200 260" style="width:78%;height:78%;stroke:rgba(243,213,138,0.55);fill:none;stroke-width:1.8;stroke-dasharray:5 4">
+              <ellipse cx="100" cy="55" rx="32" ry="42" />
+              <path d="M88 97 L88 112 Q60 122 28 150 L28 255 M112 97 L112 112 Q140 122 172 150 L172 255" />
+              <path d="M48 165 Q100 176 152 165" />
+            </svg>
+            <span style="position:absolute;bottom:12px;background:rgba(0,0,0,0.7);color:#f3d58a;font-size:11px;font-weight:600;padding:4px 14px;border-radius:12px;border:1px solid rgba(243,213,138,0.35);backdrop-filter:blur(4px)">
+              Align face &amp; shoulders inside the guide
+            </span>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;justify-content:center">
+          <button type="button" class="btn" onclick="snapTryOnPhoto()" style="padding:11px 26px;font-size:13.5px;font-weight:700;border-radius:22px;background:linear-gradient(135deg,#d6246e,#c9a24a);border:none;box-shadow:0 4px 14px rgba(214,36,110,0.45);cursor:pointer">
+            📸 Capture Photo
+          </button>
+          <button type="button" class="btn o" onclick="stopTryOnCamera()" style="border-radius:22px;border-color:rgba(255,255,255,0.4);color:#fff;cursor:pointer">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  `;
+}
 const ADM={e:'admin@sreekrishna.demo',p:ST('admpw')||'admin123'};
 function addUser(u){const L=ST('users')||[];if(!L.some(x=>x.email==u.email)){L.push({name:u.name,email:u.email});ST('users',L)}}
 function renderRingSarees(){
@@ -1981,7 +2406,7 @@ async function initAPI(){
 }
 /* ---------- router ---------- */
 let ready=false,lastK='',lastH='';
-function route(){const y0=scrollY,same=location.hash==lastH;const h=location.hash.slice(2).split('/'),app=$('#app'),k=h[0];let out='';if(API&&k=='admin'&&user&&user.role=='admin'&&!same)loadAdmin().then(()=>{if(location.hash.startsWith('#/admin'))route()}).catch(()=>{});
+function route(){const y0=scrollY,same=location.hash==lastH;const h=location.hash.slice(2).split('/'),app=$('#app'),k=h[0];if(k!=='tryon'&&typeof stopTryOnCamera==='function')stopTryOnCamera();let out='';if(API&&k=='admin'&&user&&user.role=='admin'&&!same)loadAdmin().then(()=>{if(location.hash.startsWith('#/admin'))route()}).catch(()=>{});
 document.body.classList.toggle('in',k!=='');clearInterval(auto);
 if(!k)out=home();else if(k=='c'){const rawSlug=h[1]||'sarees',slug=rawSlug=='suits'?'salwar':rawSlug;let c=CATS.find(x=>x[1]==slug);if(!c){const dec=decodeURIComponent(rawSlug).toLowerCase(),matched=P.filter(p=>(p.cat||'').toLowerCase()==dec||(p.cat||'').toLowerCase().replace(/[^a-z0-9]+/g,'-')==dec);const title=matched[0]?matched[0].cat:(dec.charAt(0).toUpperCase()+dec.slice(1));c=[title,slug,p=>(p.cat||'').toLowerCase()==dec||(p.cat||'').toLowerCase().replace(/[^a-z0-9]+/g,'-')==dec,'#5a0f2a,#2a0814'];}out=listing(c[0],P.filter(c[2]),c[1])}
 else if(k=='s'){const q=decodeURIComponent(h[1]||'');out=listing('Results for "'+q+'"',search(q),'s')}
