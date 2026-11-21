@@ -1509,32 +1509,573 @@ return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Monthly sales and ne
 function deny(){return `<div class="pg"><h2>Admin access only</h2><div class="panel" style="max-width:480px"><p>You are signed in as a customer (${esc(user.email)}). Please sign in with an admin account to access the Admin Panel.</p><p style="margin-top:14px"><button class="btn" onclick="logout();route()">Log in as Admin</button> <a class="btn o" href="#/">Back to Store</a></p></div></div>`}
 function admin(tab,arg){if(!adminUnlocked)return adminAuth();if(!user||user.role!='admin')return adminAuth();tab=tab||'dash';const T=[['dash','Dashboard'],['products','Products & Stock'],['orders','Orders'],['customers','Customers'],['pl','Profit & Loss'],['settings','Profile & Settings'],['bill','Bill']];
 return `<div class="pg"><h2>Admin Panel</h2><p class="sub">Signed in as ${user.email}. ${API?'Connected to the live database.':'Edits save in this browser and update the storefront immediately (demo storage, no server).'}</p><div class="steps" role="navigation" aria-label="Admin sections">${T.map(([k,n])=>`<a href="#/admin/${k}" class="rb ${(k==tab||(k=='orders'&&tab=='order'))?'on':''}"${(k==tab||(k=='orders'&&tab=='order'))?' aria-current="page"':''}>${n}</a>`).join('')}<button type="button" class="rb" onclick="logout();location.hash='#/'">Logout</button></div>${({dash:aDash,products:aProd,orders:aOrd,customers:aCus,pl:aPL,settings:aSet,order:()=>aOrder(arg),bill:aBill}[tab]||aDash)()}</div>`}
-function aBill(){
-  try{
-    const au={id:1,username:'admin',email:(user&&user.email)||'admin@sreekrishna.demo',first_name:'Admin',last_name:'',is_staff:true,is_superuser:true};
-    localStorage.setItem('user_info',JSON.stringify(au));
-    if(typeof TOK!=='undefined'&&TOK)localStorage.setItem('access_token',TOK);
-  }catch(_){}
-  const isServer=API||(location.protocol==='http:'||location.protocol==='https:');
-  const frameSrc=isServer?'/billing/':'./billing/index.html';
+
+let posTab = 'terminal';
+let posCart = [];
+let posPrintingBill = null;
+let posCustSearch = '';
+let posInvSearch = '';
+
+function getStoreBills() {
+  let b = ST('store_bills');
+  if (!b || !b.length) {
+    b = [
+      {
+        id: 'INV-2026-000001',
+        date: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+        iso: new Date().toISOString(),
+        customer: { name: 'Priya Sharma', phone: '9876543210', code: 'CUST-0001' },
+        items: [{ id: 'SK1000', name: 'Royal Magenta Kanchipuram Silk Saree', price: 3500, qty: 1 }],
+        subtotal: 3500,
+        discount: 0,
+        finalAmount: 3500,
+        points: 35,
+        payMode: 'UPI'
+      }
+    ];
+    ST('store_bills', b);
+  }
+  return b;
+}
+
+function getStoreCusts() {
+  let c = ST('store_custs');
+  if (!c || !c.length) {
+    c = [
+      { code: 'CUST-0001', name: 'Priya Sharma', phone: '9876543210', points: 35, totalSpent: 3500, billsCount: 1 }
+    ];
+    ST('store_custs', c);
+  }
+  return c;
+}
+
+function aBill() {
+  const bills = getStoreBills();
+  const custs = getStoreCusts();
+  const todaySales = bills.reduce((sum, b) => sum + (Number(b.finalAmount) || 0), 0);
+  const totalPoints = custs.reduce((sum, c) => sum + (Number(c.points) || 0), 0);
+  const isServer = API || (location.protocol === 'http:' || location.protocol === 'https:');
+
+  const tabs = [
+    ['terminal', '⚡ POS Billing Counter'],
+    ['invoices', '📋 Invoices & History (' + bills.length + ')'],
+    ['customers', '👥 Customer Directory (' + custs.length + ')'],
+    ['react', '📊 Full React System' + (isServer ? '' : ' (Requires Server)')]
+  ];
+
   return `<div style="margin-top:16px">
-    <div style="display:flex;justify-content:space-between;align-items:center;background:#fff;padding:14px 20px;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);margin-bottom:14px;border:1px solid #ebd8ca;flex-wrap:wrap;gap:12px">
-      <div>
-        <h3 style="margin:0;color:#5a0f2a;font-family:Georgia,serif;font-size:18px">Store Billing & POS System</h3>
-        <p style="margin:2px 0 0;font-size:12.5px;color:#777">Direct invoicing, customer loyalty points, purchase records & sales reporting.</p>
+    <div style="background:#fff;padding:16px 22px;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,0.04);margin-bottom:16px;border:1px solid #ebd8ca">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+        <div>
+          <h3 style="margin:0;color:#5a0f2a;font-family:Georgia,serif;font-size:20px">Store Billing & POS System</h3>
+          <p style="margin:2px 0 0;font-size:12.5px;color:#777">Direct counter billing, instant invoice generation, and customer loyalty points (₹100 = 1 pt).</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:12px;padding:4px 10px;border-radius:20px;font-weight:600;background:${isServer ? '#e6f7ec' : '#fff8e6'};color:${isServer ? '#0a7a4b' : '#b25e00'};border:1px solid ${isServer ? '#b2e8c4' : '#ffe099'}">
+            ${isServer ? '🟢 Live Server Connected' : '🟡 Offline Mode (Local Storage)'}
+          </span>
+          ${isServer ? `<a href="/billing/" target="_blank" class="btn" style="padding:6px 14px;font-size:12px;background:var(--mag);color:#fff;text-decoration:none">Open Fullscreen ↗</a>` : ''}
+        </div>
       </div>
-      <div style="display:flex;gap:10px;align-items:center">
-        <a href="${frameSrc}" target="_blank" class="btn" style="padding:8px 16px;font-size:12px;display:inline-flex;align-items:center;gap:6px;background:var(--mag);color:#fff;text-decoration:none">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-          Open in New Window
-        </a>
+
+      <div class="kp" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">
+        <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px"><b style="color:#5a0f2a;font-size:20px">${inr(todaySales)}</b>Total Sales</div>
+        <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px"><b style="color:#0a7a4b;font-size:20px">${bills.length}</b>Bills Issued</div>
+        <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px"><b style="color:#c9a24a;font-size:20px">+${totalPoints} pts</b>Loyalty Awarded</div>
+        <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px"><b style="color:#5a0f2a;font-size:20px">${custs.length}</b>Active Customers</div>
+      </div>
+
+      <div class="steps" style="margin:0">
+        ${tabs.map(([k, label]) => `<a href="javascript:void(0)" onclick="posTab='${k}';route()" class="rb ${posTab === k ? 'on' : ''}">${label}</a>`).join('')}
       </div>
     </div>
-    <div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);border:1px solid #e2e8f0;min-height:860px;position:relative">
-      <iframe id="billing_frame" src="${frameSrc}" style="width:100%;height:880px;border:none;display:block" title="Purchase & Billing Dashboard"></iframe>
+
+    ${posTab === 'terminal' ? renderPosTerminal() : (posTab === 'invoices' ? renderPosInvoices() : (posTab === 'customers' ? renderPosCustomers() : renderPosReactView()))}
+    ${posPrintingBill ? renderPosPrintModal() : ''}
+  </div>`;
+}
+
+function renderPosTerminal() {
+  const custs = getStoreCusts();
+  const subtotal = posCart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const discountVal = 0;
+  const finalVal = Math.max(0, subtotal - discountVal);
+  const pointsVal = Math.floor(finalVal / 100);
+
+  return `<div class="two" style="gap:20px;align-items:flex-start">
+    <div class="panel" style="background:#fff">
+      <h3 style="color:#5a0f2a;margin-bottom:12px">1. Customer & Product Details</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;color:#444">Customer Phone (10 Digits)</label>
+          <input id="pos_cphone" type="tel" inputmode="numeric" placeholder="e.g. 9876543210" oninput="posCheckExistingCust(this.value)" style="margin-bottom:4px">
+          <small id="pos_cust_hint" style="color:#0a7a4b;font-weight:600;display:block;min-height:16px"></small>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;color:#444">Customer Name</label>
+          <input id="pos_cname" type="text" placeholder="Full Name" style="margin-bottom:4px">
+          <small style="color:#888;display:block;min-height:16px">New or existing store customer</small>
+        </div>
+      </div>
+
+      <hr style="border:none;border-top:1px solid #ebd8ca;margin:16px 0">
+
+      <h4 style="color:#5a0f2a;margin-bottom:10px">Add Saree / Item to Bill</h4>
+      <div style="margin-bottom:10px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;color:#444">Select Saree / Product</label>
+        <select id="pos_prod_sel" onchange="posFillProductPrice(this.value)" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc;background:#fff;font-size:13px">
+          <option value="">-- Choose from Store Catalog (${P.length} items) --</option>
+          ${P.slice(0, 40).map(p => `<option value="${p.id}" data-name="${esc(p.name)}" data-price="${p.price}">${esc(p.name)} (${p.col || ''}) - ${inr(p.price)}</option>`).join('')}
+          <option value="CUSTOM">★ Custom Item / Other Garment</option>
+        </select>
+      </div>
+
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:12px">
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;color:#444">Item Name</label>
+          <input id="pos_item_name" type="text" placeholder="Saree or product name">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;color:#444">Unit Price (₹)</label>
+          <input id="pos_item_price" type="number" min="0" placeholder="Price">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;color:#444">Quantity</label>
+          <input id="pos_item_qty" type="number" min="1" value="1">
+        </div>
+      </div>
+
+      <button type="button" class="btn" onclick="posAddItemToCart()" style="background:#5a0f2a;color:#fff;width:100%">+ Add Item to Current Bill</button>
+    </div>
+
+    <div class="panel" style="background:#fff">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 style="color:#5a0f2a;margin:0">2. Current Bill Items</h3>
+        <span style="font-size:12px;font-weight:700;background:#fdf8f5;color:#5a0f2a;padding:4px 8px;border-radius:6px;border:1px solid #ebd8ca">
+          ${posCart.length} Item(s)
+        </span>
+      </div>
+
+      ${posCart.length ? `
+        <div style="overflow-x:auto;margin-bottom:16px">
+          <table style="width:100%;font-size:12.5px">
+            <tr style="border-bottom:2px solid #eee">
+              <th style="text-align:left;padding:6px 4px">Item</th>
+              <th style="text-align:center;padding:6px 4px">Qty</th>
+              <th style="text-align:right;padding:6px 4px">Price</th>
+              <th style="text-align:right;padding:6px 4px">Total</th>
+              <th></th>
+            </tr>
+            ${posCart.map((it, idx) => `
+              <tr style="border-bottom:1px solid #f2f2f2">
+                <td style="padding:8px 4px"><b>${esc(it.name)}</b></td>
+                <td style="text-align:center;padding:8px 4px">${it.qty}</td>
+                <td style="text-align:right;padding:8px 4px">${inr(it.price)}</td>
+                <td style="text-align:right;padding:8px 4px"><b>${inr(it.price * it.qty)}</b></td>
+                <td style="text-align:right;padding:8px 4px">
+                  <button type="button" onclick="posRemoveItem(${idx})" style="background:none;border:none;color:#b3122a;cursor:pointer;font-size:14px" title="Remove">&times;</button>
+                </td>
+              </tr>
+            `).join('')}
+          </table>
+        </div>
+      ` : `
+        <div style="text-align:center;padding:32px 16px;background:#fdfaf7;border-radius:10px;border:1px dashed #ebd8ca;margin-bottom:16px;color:#888">
+          <p style="margin:0;font-size:13px">No items added yet. Select a product on the left to begin billing.</p>
+        </div>
+      `}
+
+      <div style="background:#fdf8f4;border-radius:10px;padding:12px 14px;border:1px solid #ebd8ca;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px">
+          <span>Subtotal:</span><b>${inr(subtotal)}</b>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:13px">
+          <span>Discount (₹):</span>
+          <input id="pos_disc" type="number" min="0" value="0" oninput="posUpdateTotals()" style="width:90px;padding:4px 8px;font-size:13px;text-align:right;margin:0">
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px">
+          <span>Payment Method:</span>
+          <select id="pos_pay" style="padding:4px 8px;font-size:12.5px;border-radius:6px;border:1px solid #ccc;background:#fff">
+            <option value="Cash">Cash</option>
+            <option value="UPI">UPI / GPay / PhonePe</option>
+            <option value="Card">Credit / Debit Card</option>
+            <option value="Net Banking">Net Banking</option>
+          </select>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:17px;font-weight:700;color:#5a0f2a;border-top:1px solid #ebd8ca;padding-top:8px">
+          <span>Final Bill Amount:</span>
+          <span id="pos_grand_total">${inr(finalVal)}</span>
+        </div>
+      </div>
+
+      <div style="background:#eafaf1;border:1px solid #a3e9be;border-radius:10px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:12.5px;color:#0e623b;font-weight:600">⚡ Loyalty Points Earned:</span>
+        <b id="pos_points_badge" style="font-size:15px;color:#0a7a4b">+${pointsVal} pts (₹100 = 1 pt)</b>
+      </div>
+
+      <div style="display:flex;gap:10px">
+        <button type="button" class="btn o" onclick="posCreateBill(false)" style="flex:1" ${!posCart.length ? 'disabled' : ''}>Save Bill</button>
+        <button type="button" class="btn" onclick="posCreateBill(true)" style="flex:1;background:var(--mag);color:#fff" ${!posCart.length ? 'disabled' : ''}>🖨 Save &amp; Print Invoice</button>
+      </div>
     </div>
   </div>`;
 }
+
+function renderPosInvoices() {
+  const bills = getStoreBills();
+  const q = posInvSearch.toLowerCase().trim();
+  const filtered = bills.filter(b => !q || (b.id + ' ' + (b.customer ? b.customer.name + ' ' + b.customer.phone : '')).toLowerCase().includes(q));
+
+  return `<div class="panel" style="background:#fff">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+      <h3 style="color:#5a0f2a;margin:0">Store Invoice Records (${bills.length})</h3>
+      <input type="text" placeholder="Search by Invoice #, Customer or Phone..." value="${esc(posInvSearch)}" oninput="posInvSearch=this.value;route()" style="max-width:320px;padding:8px 12px;margin:0">
+    </div>
+
+    ${filtered.length ? `
+      <div style="overflow-x:auto">
+        <table style="width:100%;font-size:13px">
+          <tr style="border-bottom:2px solid #ebd8ca">
+            <th style="text-align:left;padding:10px 8px">Invoice #</th>
+            <th style="text-align:left;padding:10px 8px">Date</th>
+            <th style="text-align:left;padding:10px 8px">Customer</th>
+            <th style="text-align:left;padding:10px 8px">Phone</th>
+            <th style="text-align:center;padding:10px 8px">Items</th>
+            <th style="text-align:right;padding:10px 8px">Amount</th>
+            <th style="text-align:center;padding:10px 8px">Points</th>
+            <th style="text-align:center;padding:10px 8px">Pay</th>
+            <th style="text-align:right;padding:10px 8px">Action</th>
+          </tr>
+          ${filtered.map(b => `
+            <tr style="border-bottom:1px solid #f2f2f2">
+              <td style="padding:10px 8px"><b style="color:#5a0f2a">${b.id}</b></td>
+              <td style="padding:10px 8px;color:#666">${b.date}</td>
+              <td style="padding:10px 8px"><b>${esc(b.customer ? b.customer.name : 'Walk-in')}</b></td>
+              <td style="padding:10px 8px;color:#555">${esc(b.customer ? b.customer.phone : '-')}</td>
+              <td style="text-align:center;padding:10px 8px">${(b.items || []).reduce((sum, it) => sum + (Number(it.qty) || 1), 0)}</td>
+              <td style="text-align:right;padding:10px 8px"><b style="color:#5a0f2a">${inr(b.finalAmount)}</b></td>
+              <td style="text-align:center;padding:10px 8px"><span style="background:#eafaf1;color:#0a7a4b;font-weight:700;padding:2px 6px;border-radius:4px">+${b.points || 0} pts</span></td>
+              <td style="text-align:center;padding:10px 8px"><span style="font-size:11px;background:#f5efe8;padding:2px 6px;border-radius:4px">${b.payMode || 'Cash'}</span></td>
+              <td style="text-align:right;padding:10px 8px">
+                <button type="button" class="btn o" onclick="posOpenInvoice('${b.id}')" style="padding:4px 10px;font-size:11px">🖨 Print Invoice</button>
+              </td>
+            </tr>
+          `).join('')}
+        </table>
+      </div>
+    ` : `<p style="padding:24px 0;text-align:center;color:#888">No matching invoices found.</p>`}
+  </div>`;
+}
+
+function renderPosCustomers() {
+  const custs = getStoreCusts();
+  const q = posCustSearch.toLowerCase().trim();
+  const filtered = custs.filter(c => !q || (c.name + ' ' + c.phone + ' ' + c.code).toLowerCase().includes(q));
+
+  return `<div class="panel" style="background:#fff">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+      <h3 style="color:#5a0f2a;margin:0">Customer Directory & Loyalty Ledger (${custs.length})</h3>
+      <input type="text" placeholder="Search customer by name, phone or code..." value="${esc(posCustSearch)}" oninput="posCustSearch=this.value;route()" style="max-width:320px;padding:8px 12px;margin:0">
+    </div>
+
+    ${filtered.length ? `
+      <div style="overflow-x:auto">
+        <table style="width:100%;font-size:13px">
+          <tr style="border-bottom:2px solid #ebd8ca">
+            <th style="text-align:left;padding:10px 8px">Customer Code</th>
+            <th style="text-align:left;padding:10px 8px">Customer Name</th>
+            <th style="text-align:left;padding:10px 8px">Phone Number</th>
+            <th style="text-align:center;padding:10px 8px">Bills Count</th>
+            <th style="text-align:right;padding:10px 8px">Total Spent</th>
+            <th style="text-align:center;padding:10px 8px">Loyalty Balance</th>
+          </tr>
+          ${filtered.map(c => `
+            <tr style="border-bottom:1px solid #f2f2f2">
+              <td style="padding:10px 8px"><code style="background:#fdf8f4;padding:2px 6px;border-radius:4px;color:#5a0f2a;font-weight:700">${c.code}</code></td>
+              <td style="padding:10px 8px"><b>${esc(c.name)}</b></td>
+              <td style="padding:10px 8px">${esc(c.phone)}</td>
+              <td style="text-align:center;padding:10px 8px">${c.billsCount || 1}</td>
+              <td style="text-align:right;padding:10px 8px"><b>${inr(c.totalSpent || 0)}</b></td>
+              <td style="text-align:center;padding:10px 8px">
+                <span style="background:#eafaf1;color:#0a7a4b;font-weight:700;padding:4px 10px;border-radius:12px;border:1px solid #b7ebd0;display:inline-block">
+                  ★ ${c.points || 0} Points
+                </span>
+              </td>
+            </tr>
+          `).join('')}
+        </table>
+      </div>
+    ` : `<p style="padding:24px 0;text-align:center;color:#888">No matching customers found.</p>`}
+  </div>`;
+}
+
+function renderPosReactView() {
+  const isServer = API || (location.protocol === 'http:' || location.protocol === 'https:');
+  if (isServer) {
+    return `<div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);border:1px solid #e2e8f0;min-height:860px;position:relative">
+      <iframe id="billing_frame" src="/billing/" style="width:100%;height:880px;border:none;display:block" title="Purchase & Billing Dashboard"></iframe>
+    </div>`;
+  }
+
+  return `<div class="panel" style="background:#fff;text-align:center;padding:40px 20px">
+    <div style="font-size:42px;margin-bottom:10px">💻</div>
+    <h3 style="color:#5a0f2a;margin-bottom:8px">Full React POS Dashboard</h3>
+    <p style="color:#666;max-width:540px;margin:0 auto 20px;font-size:13.5px;line-height:1.6">
+      The standalone React single-page dashboard communicates with the live MySQL database via HTTP APIs. Because you are currently running from local <code>file:///</code>, browsers restrict CORS network requests.
+    </p>
+    <div style="background:#fdf8f4;border:1px solid #ebd8ca;border-radius:12px;max-width:520px;margin:0 auto 24px;padding:16px;text-align:left">
+      <b style="color:#5a0f2a;display:block;margin-bottom:8px">To launch the Live React POS with MySQL database:</b>
+      <ol style="margin:0;padding-left:20px;font-size:13px;color:#444;line-height:1.8">
+        <li>Open terminal in the project folder</li>
+        <li>Run: <code>npm start</code></li>
+        <li>Open in browser: <a href="http://localhost:3000/#/admin/bill" target="_blank" style="color:var(--mag);font-weight:700">http://localhost:3000/#/admin/bill</a></li>
+      </ol>
+    </div>
+    <div style="display:flex;justify-content:center;gap:12px">
+      <a href="http://localhost:3000/billing/" target="_blank" class="btn" style="background:var(--mag);color:#fff;padding:10px 22px">Launch http://localhost:3000/billing/ ↗</a>
+      <button type="button" class="btn o" onclick="posTab='terminal';route()">← Return to POS Billing Counter</button>
+    </div>
+  </div>`;
+}
+
+function posFillProductPrice(prodId) {
+  if (!prodId) return;
+  if (prodId === 'CUSTOM') {
+    $('#pos_item_name').value = '';
+    $('#pos_item_price').value = '';
+    $('#pos_item_name').focus();
+    return;
+  }
+  const p = find(prodId);
+  if (p) {
+    $('#pos_item_name').value = p.name;
+    $('#pos_item_price').value = p.price;
+  }
+}
+
+function posCheckExistingCust(val) {
+  const phone = (val || '').replace(/\D/g, '').slice(-10);
+  const hint = $('#pos_cust_hint');
+  if (phone.length === 10) {
+    const custs = getStoreCusts();
+    const c = custs.find(x => x.phone === phone);
+    if (c) {
+      if (!$('#pos_cname').value) $('#pos_cname').value = c.name;
+      if (hint) hint.innerHTML = '★ Matched Customer: ' + esc(c.name) + ' (' + c.code + ') · ' + (c.points || 0) + ' Loyalty Pts';
+    } else {
+      if (hint) hint.innerHTML = '✓ New customer registration';
+    }
+  } else {
+    if (hint) hint.innerHTML = '';
+  }
+}
+
+function posAddItemToCart() {
+  const name = ($('#pos_item_name').value || '').trim();
+  const price = Math.max(0, +$('#pos_item_price').value || 0);
+  const qty = Math.max(1, +$('#pos_item_qty').value || 1);
+
+  if (!name) return toast('Please enter or select an item name');
+  if (!price) return toast('Please enter a valid price for the item');
+
+  posCart.push({ name, price, qty });
+  $('#pos_item_name').value = '';
+  $('#pos_item_price').value = '';
+  $('#pos_item_qty').value = 1;
+  $('#pos_prod_sel').value = '';
+  toast('Item added to bill ✓');
+  route();
+}
+
+function posRemoveItem(idx) {
+  posCart.splice(idx, 1);
+  route();
+}
+
+function posUpdateTotals() {
+  const subtotal = posCart.reduce((sum, it) => sum + it.price * it.qty, 0);
+  const discount = Math.max(0, +($('#pos_disc') ? $('#pos_disc').value : 0) || 0);
+  const finalVal = Math.max(0, subtotal - discount);
+  const pointsVal = Math.floor(finalVal / 100);
+
+  const gEl = $('#pos_grand_total');
+  if (gEl) gEl.textContent = inr(finalVal);
+  const pEl = $('#pos_points_badge');
+  if (pEl) pEl.textContent = '+' + pointsVal + ' pts (₹100 = 1 pt)';
+}
+
+function posCreateBill(printNow) {
+  const name = ($('#pos_cname').value || '').trim();
+  const rawPhone = ($('#pos_cphone').value || '').trim();
+  const phone = rawPhone.replace(/\D/g, '').slice(-10);
+
+  if (!name) return toast('Please enter customer name');
+  if (phone.length !== 10) return toast('Please enter a valid 10-digit phone number');
+  if (!posCart.length) return toast('Please add at least one item to the bill');
+
+  const subtotal = posCart.reduce((sum, it) => sum + it.price * it.qty, 0);
+  const discount = Math.max(0, +($('#pos_disc') ? $('#pos_disc').value : 0) || 0);
+  const finalAmount = Math.max(0, subtotal - discount);
+  const points = Math.floor(finalAmount / 100);
+  const payMode = $('#pos_pay') ? $('#pos_pay').value : 'Cash';
+
+  const bills = getStoreBills();
+  const invNo = 'INV-2026-' + String(bills.length + 1).padStart(6, '0');
+
+  // Customer handling
+  const custs = getStoreCusts();
+  let cust = custs.find(c => c.phone === phone);
+  if (!cust) {
+    cust = {
+      code: 'CUST-' + String(custs.length + 1).padStart(4, '0'),
+      name,
+      phone,
+      points: 0,
+      totalSpent: 0,
+      billsCount: 0
+    };
+    custs.push(cust);
+  } else {
+    cust.name = name;
+  }
+  cust.points = (cust.points || 0) + points;
+  cust.totalSpent = (cust.totalSpent || 0) + finalAmount;
+  cust.billsCount = (cust.billsCount || 0) + 1;
+  ST('store_custs', custs);
+
+  const bill = {
+    id: invNo,
+    date: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+    iso: new Date().toISOString(),
+    customer: { name, phone, code: cust.code },
+    items: [...posCart],
+    subtotal,
+    discount,
+    finalAmount,
+    points,
+    payMode,
+    custPointsAfter: cust.points
+  };
+  bills.unshift(bill);
+  ST('store_bills', bills);
+
+  // If live backend API is connected, also post to server /api/customers
+  if (API) {
+    api('POST', '/customers/', {
+      name,
+      phone_number: phone,
+      total_purchase: finalAmount,
+      bill_no: invNo
+    }).catch(e => console.warn('API bill sync note:', e));
+  }
+
+  posCart = [];
+  toast(`✓ Bill #${invNo} generated! +${points} loyalty points awarded.`);
+
+  if (printNow) {
+    posPrintingBill = bill;
+    route();
+  } else {
+    route();
+  }
+}
+
+function posOpenInvoice(invId) {
+  const bills = getStoreBills();
+  const b = bills.find(x => x.id === invId);
+  if (!b) return toast('Invoice not found');
+  posPrintingBill = b;
+  route();
+}
+
+function renderPosPrintModal() {
+  const b = posPrintingBill;
+  if (!b) return '';
+
+  return `<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto" onclick="if(event.target===this){posPrintingBill=null;route()}">
+    <div style="background:#fff;width:100%;max-width:540px;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,0.25);overflow:hidden;animation:popIn .2s ease">
+      <div class="noprint" style="background:#5a0f2a;color:#fcecd2;padding:12px 18px;display:flex;justify-content:space-between;align-items:center">
+        <b style="font-size:14px">Tax Invoice / Bill Preview</b>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn" onclick="window.print()" style="padding:4px 12px;font-size:12px;background:#f6d289;color:#5a0f2a;font-weight:700">🖨 Print Invoice</button>
+          <button type="button" onclick="posPrintingBill=null;route()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer">&times;</button>
+        </div>
+      </div>
+
+      <div id="print_area" style="padding:28px 24px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:#2c1b18">
+        <div style="text-align:center;border-bottom:2px dashed #b3122a;padding-bottom:14px;margin-bottom:14px">
+          <h2 style="margin:0;color:#5a0f2a;font-size:22px;font-family:Georgia,serif;letter-spacing:1px">SREEKRISHNA TEXTILES</h2>
+          <p style="margin:2px 0;font-size:11.5px;color:#777">Tradition Meets Elegance · Heritage Silks & Sarees</p>
+          <p style="margin:2px 0;font-size:11px;color:#555">Kovai Road, Pollachi - 642002 · Phone: +91 9976392317</p>
+          <div style="margin-top:6px;display:inline-block;padding:2px 10px;background:#fdf8f4;border:1px solid #ebd8ca;border-radius:4px;font-size:11px;font-weight:700;color:#5a0f2a">
+            RETAIL TAX INVOICE
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:14px;line-height:1.6">
+          <div>
+            <b>Billed To:</b><br>
+            <span style="font-size:13px;font-weight:700">${esc(b.customer ? b.customer.name : 'Walk-in')}</span><br>
+            Phone: ${esc(b.customer ? b.customer.phone : '-')}<br>
+            Cust Code: <code>${esc(b.customer ? b.customer.code : '-')}</code>
+          </div>
+          <div style="text-align:right">
+            <b>Invoice: ${b.id}</b><br>
+            Date: ${b.date}<br>
+            Payment: <b>${b.payMode || 'Cash'}</b>
+          </div>
+        </div>
+
+        <table style="width:100%;font-size:12px;border-collapse:collapse;margin-bottom:14px">
+          <thead>
+            <tr style="border-top:1px solid #333;border-bottom:1px solid #333">
+              <th style="text-align:left;padding:6px 2px">Item</th>
+              <th style="text-align:center;padding:6px 2px">Qty</th>
+              <th style="text-align:right;padding:6px 2px">Price</th>
+              <th style="text-align:right;padding:6px 2px">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(b.items || []).map(it => `
+              <tr style="border-bottom:1px solid #eee">
+                <td style="padding:6px 2px"><b>${esc(it.name)}</b></td>
+                <td style="text-align:center;padding:6px 2px">${it.qty}</td>
+                <td style="text-align:right;padding:6px 2px">${inr(it.price)}</td>
+                <td style="text-align:right;padding:6px 2px"><b>${inr(it.price * it.qty)}</b></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div style="border-top:2px dashed #b3122a;padding-top:10px;margin-bottom:14px;font-size:13px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <span>Subtotal:</span><span>${inr(b.subtotal)}</span>
+          </div>
+          ${b.discount ? `
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#0a7a4b">
+              <span>Discount:</span><span>-${inr(b.discount)}</span>
+            </div>
+          ` : ''}
+          <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;color:#5a0f2a;border-top:1px solid #ccc;padding-top:6px">
+            <span>Grand Total:</span><span>${inr(b.finalAmount)}</span>
+          </div>
+        </div>
+
+        <div style="background:#fdf8f4;border:1px dashed #c9a24a;border-radius:8px;padding:10px;text-align:center;margin-bottom:14px">
+          <span style="font-size:11px;color:#8a5e1e;font-weight:700;letter-spacing:1px;text-transform:uppercase;display:block">Customer Loyalty Rewards</span>
+          <b style="font-size:15px;color:#0a7a4b">+${b.points || 0} Points Earned on this Bill</b>
+          <small style="display:block;color:#666;font-size:11px;margin-top:2px">Total Loyalty Points Balance: <b>${b.custPointsAfter || b.points || 0} pts</b> (₹100 = 1 pt)</small>
+        </div>
+
+        <div style="text-align:center;font-size:11px;color:#777;border-top:1px solid #eee;padding-top:10px">
+          <p style="margin:0 0 2px;font-weight:600;color:#5a0f2a">Thank you for shopping with Sreekrishna Textiles!</p>
+          <p style="margin:0">Goods once sold cannot be returned. Exchange within 7 days with bill.</p>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
 function aDash(){const M=monthly(),S=M.reduce((a,d)=>a+d.sales,0),C=M.reduce((a,d)=>a+d.cogs,0),E=M.reduce((a,d)=>a+d.te,0),N=S-C-E,O=M.reduce((a,d)=>a+d.orders,0),cur=M[M.length-1]||{sales:0},prev=M[M.length-2]||cur;
 const k=(v,l,c)=>`<div><b${c?` style="color:${c}"`:''}>${v}</b>${l}</div>`,inv=P.reduce((a,p)=>a+p.cost*p.stock,0),low=P.filter(p=>p.stock>0&&p.stock<CFG.low).length,oos=P.filter(p=>!p.stock).length;
 const cats=API&&ADMC.cats?ADMC.cats.map(c=>[c.n,c.v]):[['Sarees',.64],['Salwar/Chudi Materials',.15],['Lehengas',.12],['Kurtis',.09]],top=API&&ADMC.top?ADMC.top:[...P].sort((a,b)=>R(+b.id.slice(2),97)-R(+a.id.slice(2),97)).slice(0,5).map(p=>({name:p.name,units:R(+p.id.slice(2),97)+20,stock:p.stock}));
