@@ -1823,6 +1823,26 @@ function posUpdateTotals() {
   if (pEl) pEl.textContent = '+' + pointsVal + ' pts (₹100 = 1 pt)';
 }
 
+function posFilterInvoicesLive(query) {
+  posInvSearch = query;
+  const q = (query || '').toLowerCase().trim();
+  const rows = document.querySelectorAll('.inv-bill-row');
+  rows.forEach(r => {
+    const text = r.getAttribute('data-search') || '';
+    r.style.display = (!q || text.includes(q)) ? '' : 'none';
+  });
+}
+
+function posFilterCustomersLive(query) {
+  posCustSearch = query;
+  const q = (query || '').toLowerCase().trim();
+  const rows = document.querySelectorAll('.cust-row');
+  rows.forEach(r => {
+    const text = r.getAttribute('data-search') || '';
+    r.style.display = (!q || text.includes(q)) ? '' : 'none';
+  });
+}
+
 function renderPosInvoices() {
   const bills = getStoreBills();
   const q = posInvSearch.toLowerCase().trim();
@@ -1831,39 +1851,43 @@ function renderPosInvoices() {
   return `<div class="panel" style="background:#fff">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px">
       <h3 style="color:#5a0f2a;margin:0">Store Invoice Records (${bills.length})</h3>
-      <input type="text" placeholder="Search by Invoice #, Customer or Phone..." value="${esc(posInvSearch)}" oninput="posInvSearch=this.value;route()" style="max-width:320px;padding:8px 12px;margin:0">
+      <input id="inv_search_input" type="text" placeholder="Search by Invoice #, Customer or Phone..." value="${esc(posInvSearch)}" oninput="posFilterInvoicesLive(this.value)" style="max-width:320px;padding:8px 12px;margin:0">
     </div>
 
     ${filtered.length ? `
       <div style="overflow-x:auto">
         <table style="width:100%;font-size:13px">
-          <tr style="border-bottom:2px solid #ebd8ca">
-            <th style="text-align:left;padding:10px 8px">Invoice #</th>
-            <th style="text-align:left;padding:10px 8px">Date</th>
-            <th style="text-align:left;padding:10px 8px">Customer</th>
-            <th style="text-align:left;padding:10px 8px">Phone</th>
-            <th style="text-align:center;padding:10px 8px">Items</th>
-            <th style="text-align:right;padding:10px 8px">Amount</th>
-            <th style="text-align:center;padding:10px 8px">Points</th>
-            <th style="text-align:center;padding:10px 8px">Pay</th>
-            <th style="text-align:right;padding:10px 8px">Action</th>
-          </tr>
-          ${filtered.map(b => `
-            <tr style="border-bottom:1px solid #f2f2f2">
-              <td style="padding:10px 8px"><b style="color:#5a0f2a">${b.id}</b></td>
-              <td style="padding:10px 8px;color:#666">${b.date}</td>
-              <td style="padding:10px 8px"><b>${esc(b.customer ? b.customer.name : 'Walk-in')}</b></td>
-              <td style="padding:10px 8px;color:#555">${esc(b.customer ? b.customer.phone : '-')}</td>
-              <td style="text-align:center;padding:10px 8px">${(b.items || []).reduce((sum, it) => sum + (Number(it.qty) || 1), 0)}</td>
-              <td style="text-align:right;padding:10px 8px"><b style="color:#5a0f2a">${inr(b.finalAmount)}</b></td>
-              <td style="text-align:center;padding:10px 8px"><span style="background:#eafaf1;color:#0a7a4b;font-weight:700;padding:2px 6px;border-radius:4px">+${b.points || 0} pts</span></td>
-              <td style="text-align:center;padding:10px 8px"><span style="font-size:11px;background:#f5efe8;padding:2px 6px;border-radius:4px">${b.payMode || 'Cash'}</span></td>
-              <td style="text-align:right;padding:10px 8px;white-space:nowrap">
-                <button type="button" class="btn o" onclick="posOpenEditBill('${b.id}')" style="padding:4px 8px;font-size:11px;margin-right:6px">✏ Edit</button>
-                <button type="button" class="btn o" onclick="posOpenInvoice('${b.id}')" style="padding:4px 10px;font-size:11px">🖨 Print Invoice</button>
-              </td>
+          <thead>
+            <tr style="border-bottom:2px solid #ebd8ca">
+              <th style="text-align:left;padding:10px 8px">Invoice #</th>
+              <th style="text-align:left;padding:10px 8px">Date</th>
+              <th style="text-align:left;padding:10px 8px">Customer</th>
+              <th style="text-align:left;padding:10px 8px">Phone</th>
+              <th style="text-align:center;padding:10px 8px">Items</th>
+              <th style="text-align:right;padding:10px 8px">Amount</th>
+              <th style="text-align:center;padding:10px 8px">Points</th>
+              <th style="text-align:center;padding:10px 8px">Pay</th>
+              <th style="text-align:right;padding:10px 8px">Action</th>
             </tr>
-          `).join('')}
+          </thead>
+          <tbody>
+            ${filtered.map(b => `
+              <tr class="inv-bill-row" data-search="${esc((b.id + ' ' + (b.customer ? b.customer.name + ' ' + b.customer.phone : '')).toLowerCase())}" style="border-bottom:1px solid #f2f2f2">
+                <td style="padding:10px 8px"><b style="color:#5a0f2a">${b.id}</b></td>
+                <td style="padding:10px 8px;color:#666">${b.date}</td>
+                <td style="padding:10px 8px"><b>${esc(b.customer ? b.customer.name : 'Walk-in')}</b></td>
+                <td style="padding:10px 8px;color:#555">${esc(b.customer ? b.customer.phone : '-')}</td>
+                <td style="text-align:center;padding:10px 8px">${(b.items || []).reduce((sum, it) => sum + (Number(it.qty) || 1), 0)}</td>
+                <td style="text-align:right;padding:10px 8px"><b style="color:#5a0f2a">${inr(b.finalAmount)}</b></td>
+                <td style="text-align:center;padding:10px 8px"><span style="background:#eafaf1;color:#0a7a4b;font-weight:700;padding:2px 6px;border-radius:4px">+${b.points || 0} pts</span></td>
+                <td style="text-align:center;padding:10px 8px"><span style="font-size:11px;background:#f5efe8;padding:2px 6px;border-radius:4px">${b.payMode || 'Cash'}</span></td>
+                <td style="text-align:right;padding:10px 8px;white-space:nowrap">
+                  <button type="button" class="btn o" onclick="posOpenEditBill('${b.id}')" style="padding:4px 8px;font-size:11px;margin-right:6px">✏ Edit</button>
+                  <button type="button" class="btn o" onclick="posOpenInvoice('${b.id}')" style="padding:4px 10px;font-size:11px">🖨 Print Invoice</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
         </table>
       </div>
     ` : `<p style="padding:24px 0;text-align:center;color:#888">No matching invoices found.</p>`}
@@ -1878,34 +1902,38 @@ function renderPosCustomers() {
   return `<div class="panel" style="background:#fff">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px">
       <h3 style="color:#5a0f2a;margin:0">Customer Directory & Loyalty Ledger (${custs.length})</h3>
-      <input type="text" placeholder="Search customer by name, phone or code..." value="${esc(posCustSearch)}" oninput="posCustSearch=this.value;route()" style="max-width:320px;padding:8px 12px;margin:0">
+      <input id="cust_search_input" type="text" placeholder="Search customer by name, phone or code..." value="${esc(posCustSearch)}" oninput="posFilterCustomersLive(this.value)" style="max-width:320px;padding:8px 12px;margin:0">
     </div>
 
     ${filtered.length ? `
       <div style="overflow-x:auto">
         <table style="width:100%;font-size:13px">
-          <tr style="border-bottom:2px solid #ebd8ca">
-            <th style="text-align:left;padding:10px 8px">Customer Code</th>
-            <th style="text-align:left;padding:10px 8px">Customer Name</th>
-            <th style="text-align:left;padding:10px 8px">Phone Number</th>
-            <th style="text-align:center;padding:10px 8px">Bills Count</th>
-            <th style="text-align:right;padding:10px 8px">Total Spent</th>
-            <th style="text-align:center;padding:10px 8px">Loyalty Balance</th>
-          </tr>
-          ${filtered.map(c => `
-            <tr style="border-bottom:1px solid #f2f2f2">
-              <td style="padding:10px 8px"><code style="background:#fdf8f4;padding:2px 6px;border-radius:4px;color:#5a0f2a;font-weight:700">${c.code}</code></td>
-              <td style="padding:10px 8px"><b>${esc(c.name)}</b></td>
-              <td style="padding:10px 8px">${esc(c.phone)}</td>
-              <td style="text-align:center;padding:10px 8px">${c.billsCount || 1}</td>
-              <td style="text-align:right;padding:10px 8px"><b>${inr(c.totalSpent || 0)}</b></td>
-              <td style="text-align:center;padding:10px 8px">
-                <span style="background:#eafaf1;color:#0a7a4b;font-weight:700;padding:4px 10px;border-radius:12px;border:1px solid #b7ebd0;display:inline-block">
-                  ★ ${c.points || 0} Points
-                </span>
-              </td>
+          <thead>
+            <tr style="border-bottom:2px solid #ebd8ca">
+              <th style="text-align:left;padding:10px 8px">Customer Code</th>
+              <th style="text-align:left;padding:10px 8px">Customer Name</th>
+              <th style="text-align:left;padding:10px 8px">Phone Number</th>
+              <th style="text-align:center;padding:10px 8px">Bills Count</th>
+              <th style="text-align:right;padding:10px 8px">Total Spent</th>
+              <th style="text-align:center;padding:10px 8px">Loyalty Balance</th>
             </tr>
-          `).join('')}
+          </thead>
+          <tbody>
+            ${filtered.map(c => `
+              <tr class="cust-row" data-search="${esc((c.name + ' ' + c.phone + ' ' + c.code).toLowerCase())}" style="border-bottom:1px solid #f2f2f2">
+                <td style="padding:10px 8px"><code style="background:#fdf8f4;padding:2px 6px;border-radius:4px;color:#5a0f2a;font-weight:700">${c.code}</code></td>
+                <td style="padding:10px 8px"><b>${esc(c.name)}</b></td>
+                <td style="padding:10px 8px">${esc(c.phone)}</td>
+                <td style="text-align:center;padding:10px 8px">${c.billsCount || 1}</td>
+                <td style="text-align:right;padding:10px 8px"><b>${inr(c.totalSpent || 0)}</b></td>
+                <td style="text-align:center;padding:10px 8px">
+                  <span style="background:#eafaf1;color:#0a7a4b;font-weight:700;padding:4px 10px;border-radius:12px;border:1px solid #b7ebd0;display:inline-block">
+                    ★ ${c.points || 0} Points
+                  </span>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
         </table>
       </div>
     ` : `<p style="padding:24px 0;text-align:center;color:#888">No matching customers found.</p>`}
@@ -1956,6 +1984,59 @@ function getFilteredReportBills() {
   });
 }
 
+function posFilterReportLive(query) {
+  posRepSearch = query;
+  const q = (query || '').toLowerCase().trim();
+  const rows = document.querySelectorAll('.rep-bill-row');
+  let visibleCount = 0;
+  let totalSales = 0;
+  let totalPoints = 0;
+  let totalItems = 0;
+  let totalSub = 0;
+  let totalDisc = 0;
+
+  rows.forEach(r => {
+    const text = r.getAttribute('data-search') || '';
+    const match = !q || text.includes(q);
+    r.style.display = match ? '' : 'none';
+    if (match) {
+      visibleCount++;
+      totalSales += parseFloat(r.getAttribute('data-amount') || 0);
+      totalPoints += parseInt(r.getAttribute('data-points') || 0, 10);
+      totalItems += parseInt(r.getAttribute('data-items') || 0, 10);
+      totalSub += parseFloat(r.getAttribute('data-subtotal') || 0);
+      totalDisc += parseFloat(r.getAttribute('data-discount') || 0);
+    }
+  });
+
+  const kSales = document.getElementById('rep_kpi_sales');
+  if (kSales) kSales.textContent = inr(totalSales);
+  const kCount = document.getElementById('rep_kpi_count');
+  if (kCount) kCount.textContent = visibleCount;
+  const kPts = document.getElementById('rep_kpi_points');
+  if (kPts) kPts.textContent = '+' + totalPoints + ' pts';
+  const kAvg = document.getElementById('rep_kpi_avg');
+  if (kAvg) kAvg.textContent = inr(visibleCount ? Math.round(totalSales / visibleCount) : 0);
+
+  const fCount = document.getElementById('rep_ft_count');
+  if (fCount) fCount.textContent = `TOTALS (${visibleCount} Bills)`;
+  const fItems = document.getElementById('rep_ft_items');
+  if (fItems) fItems.textContent = totalItems;
+  const fSub = document.getElementById('rep_ft_subtotal');
+  if (fSub) fSub.textContent = inr(totalSub);
+  const fDisc = document.getElementById('rep_ft_discount');
+  if (fDisc) fDisc.textContent = '-' + inr(totalDisc);
+  const fSales = document.getElementById('rep_ft_sales');
+  if (fSales) fSales.textContent = inr(totalSales);
+  const fPts = document.getElementById('rep_ft_points');
+  if (fPts) fPts.textContent = '+' + totalPoints + ' pts';
+
+  const noMatch = document.getElementById('rep_no_match');
+  if (noMatch) noMatch.style.display = (visibleCount === 0 && rows.length > 0) ? 'block' : 'none';
+  const ftRow = document.getElementById('rep_ft_row');
+  if (ftRow) ftRow.style.display = visibleCount === 0 ? 'none' : '';
+}
+
 function renderPosReports() {
   const filtered = getFilteredReportBills();
   const totalSales = filtered.reduce((s, b) => s + (Number(b.finalAmount) || 0), 0);
@@ -1980,11 +2061,11 @@ function renderPosReports() {
         <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px">
           <div style="display:flex;align-items:center;gap:6px">
             <label style="font-size:12px;font-weight:700;color:#5a0f2a">From Date:</label>
-            <input type="date" value="${posRepFrom}" onchange="posRepFrom=this.value;route()" style="padding:6px 10px;font-size:12.5px;border:1px solid #ccc;border-radius:6px;background:#fff;margin:0">
+            <input id="pos_rep_from" type="date" value="${posRepFrom}" onchange="posRepFrom=this.value;route()" style="padding:6px 10px;font-size:12.5px;border:1px solid #ccc;border-radius:6px;background:#fff;margin:0">
           </div>
           <div style="display:flex;align-items:center;gap:6px">
             <label style="font-size:12px;font-weight:700;color:#5a0f2a">To Date:</label>
-            <input type="date" value="${posRepTo}" onchange="posRepTo=this.value;route()" style="padding:6px 10px;font-size:12.5px;border:1px solid #ccc;border-radius:6px;background:#fff;margin:0">
+            <input id="pos_rep_to" type="date" value="${posRepTo}" onchange="posRepTo=this.value;route()" style="padding:6px 10px;font-size:12.5px;border:1px solid #ccc;border-radius:6px;background:#fff;margin:0">
           </div>
           <div style="display:flex;gap:6px">
             <button type="button" class="btn o" onclick="posSetDateFilter('today')" style="padding:4px 10px;font-size:11.5px">Today</button>
@@ -1994,26 +2075,26 @@ function renderPosReports() {
           </div>
         </div>
 
-        <input type="text" placeholder="Filter by invoice, customer, phone..." value="${esc(posRepSearch)}" oninput="posRepSearch=this.value;route()" style="max-width:260px;padding:6px 10px;font-size:12px;margin:0">
+        <input id="rep_search_input" type="text" placeholder="Filter by invoice, customer, phone..." value="${esc(posRepSearch)}" oninput="posFilterReportLive(this.value)" style="max-width:260px;padding:6px 10px;font-size:12px;margin:0">
       </div>
     </div>
 
     <!-- Filtered Summary KPI Cards -->
     <div class="kp" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px">
       <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px">
-        <b style="color:#5a0f2a;font-size:22px">${inr(totalSales)}</b>
+        <b id="rep_kpi_sales" style="color:#5a0f2a;font-size:22px">${inr(totalSales)}</b>
         Filtered Total Sales
       </div>
       <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px">
-        <b style="color:#0a7a4b;font-size:22px">${filtered.length}</b>
+        <b id="rep_kpi_count" style="color:#0a7a4b;font-size:22px">${filtered.length}</b>
         Filtered Bills Count
       </div>
       <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px">
-        <b style="color:#c9a24a;font-size:22px">+${totalPoints} pts</b>
+        <b id="rep_kpi_points" style="color:#c9a24a;font-size:22px">+${totalPoints} pts</b>
         Filtered Total Points
       </div>
       <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px">
-        <b style="color:#5a0f2a;font-size:22px">${inr(avgBill)}</b>
+        <b id="rep_kpi_avg" style="color:#5a0f2a;font-size:22px">${inr(avgBill)}</b>
         Average Bill Value
       </div>
     </div>
@@ -2037,9 +2118,9 @@ function renderPosReports() {
               <th style="text-align:right;padding:10px 8px">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="rep_bills_tbody">
             ${filtered.map(b => `
-              <tr style="border-bottom:1px solid #f2f2f2">
+              <tr class="rep-bill-row" data-search="${esc((b.id + ' ' + (b.customer ? b.customer.name + ' ' + b.customer.phone : '')).toLowerCase())}" data-amount="${b.finalAmount}" data-points="${b.points || 0}" data-items="${(b.items || []).reduce((sum, it) => sum + (Number(it.qty) || 1), 0)}" data-subtotal="${b.subtotal || b.finalAmount}" data-discount="${b.discount || 0}" style="border-bottom:1px solid #f2f2f2">
                 <td style="padding:10px 8px"><b style="color:#5a0f2a">${b.id}</b></td>
                 <td style="padding:10px 8px;color:#666">${b.date}</td>
                 <td style="padding:10px 8px"><b>${esc(b.customer ? b.customer.name : 'Walk-in')}</b></td>
@@ -2056,17 +2137,18 @@ function renderPosReports() {
                 </td>
               </tr>
             `).join('')}
-            <tr style="border-top:2px solid #5a0f2a;background:#fdf8f5;font-weight:700">
-              <td colspan="4" style="padding:12px 8px;color:#5a0f2a">TOTALS (${filtered.length} Bills)</td>
-              <td style="text-align:center;padding:12px 8px">${filtered.reduce((s, b) => s + (b.items || []).reduce((is, it) => is + (Number(it.qty) || 1), 0), 0)}</td>
-              <td style="text-align:right;padding:12px 8px">${inr(filtered.reduce((s, b) => s + (Number(b.subtotal) || Number(b.finalAmount) || 0), 0))}</td>
-              <td style="text-align:right;padding:12px 8px;color:#0a7a4b">-${inr(filtered.reduce((s, b) => s + (Number(b.discount) || 0), 0))}</td>
-              <td style="text-align:right;padding:12px 8px;color:#5a0f2a;font-size:15px">${inr(totalSales)}</td>
-              <td style="text-align:center;padding:12px 8px;color:#0a7a4b">+${totalPoints} pts</td>
+            <tr id="rep_ft_row" style="border-top:2px solid #5a0f2a;background:#fdf8f5;font-weight:700">
+              <td id="rep_ft_count" colspan="4" style="padding:12px 8px;color:#5a0f2a">TOTALS (${filtered.length} Bills)</td>
+              <td id="rep_ft_items" style="text-align:center;padding:12px 8px">${filtered.reduce((s, b) => s + (b.items || []).reduce((is, it) => is + (Number(it.qty) || 1), 0), 0)}</td>
+              <td id="rep_ft_subtotal" style="text-align:right;padding:12px 8px">${inr(filtered.reduce((s, b) => s + (Number(b.subtotal) || Number(b.finalAmount) || 0), 0))}</td>
+              <td id="rep_ft_discount" style="text-align:right;padding:12px 8px;color:#0a7a4b">-${inr(filtered.reduce((s, b) => s + (Number(b.discount) || 0), 0))}</td>
+              <td id="rep_ft_sales" style="text-align:right;padding:12px 8px;color:#5a0f2a;font-size:15px">${inr(totalSales)}</td>
+              <td id="rep_ft_points" style="text-align:center;padding:12px 8px;color:#0a7a4b">+${totalPoints} pts</td>
               <td colspan="2"></td>
             </tr>
           </tbody>
         </table>
+        <p id="rep_no_match" style="display:none;padding:24px 0;text-align:center;color:#888">No bills match your search criteria.</p>
       </div>
     ` : `<p style="padding:32px 0;text-align:center;color:#888">No bills found in the selected date range.</p>`}
   </div>`;
@@ -3096,7 +3178,10 @@ else if(k=='product')out=product(h[1]);else if(k=='cart')out=cartPage();else if(
 else if(k=='wishlist')out=`<div class="pg"><h2>Wishlist</h2><div class="grid">${wish.map(id=>card(find(id))).join('')||'<p>Nothing saved yet.</p>'}</div></div>`;
 else if(k=='login'||k=='register')out=auth(k=='register');else if(k=='forgot'||k=='forgot-password')out=forgotPasswordView();else if(k=='account')out=account();else if(k=='orders')out=ordersPage();else if(k=='order')out=ordersPage(h[1]);else if(k=='admin')out=admin(h[1],h[2]);else if(k=='track')out=trackPage();
 else if(k=='p'&&PAGES[h[1]])out=`<div class="pg"><h2>${PAGES[h[1]][0]}</h2><div class="panel">${PAGES[h[1]][1]}</div></div>`;else out='<div class="pg"><h2>Page not found</h2></div>';
-app.innerHTML=out;{const t=app.querySelector('.pg h2');if(t){const h1=document.createElement('h1');h1.className=t.className;h1.setAttribute('style',t.getAttribute('style')||'');h1.innerHTML=t.innerHTML;t.replaceWith(h1)}const hh=app.querySelector('h1');document.title=(hh?hh.textContent+' | ':'')+'Sreekrishna Textiles';if(lastH&&!same)app.focus({preventScroll:true})}if(k=='c'||k=='s'){const key=k=='s'?'s':h[1]||'sarees';bindF(key,()=>{const y=scrollY;route();scrollTo(0,y)})}
+const _ae=document.activeElement;const _aid=(_ae&&(_ae.tagName==='INPUT'||_ae.tagName==='TEXTAREA'||_ae.tagName==='SELECT'))?_ae.id:null;const _ass=_ae&&typeof _ae.selectionStart==='number'?_ae.selectionStart:null;const _ase=_ae&&typeof _ae.selectionEnd==='number'?_ae.selectionEnd:null;
+app.innerHTML=out;
+if(_aid){const _res=document.getElementById(_aid);if(_res){_res.focus();if(_ass!==null&&_ase!==null){try{_res.setSelectionRange(_ass,_ase)}catch(_){}}}}
+{const t=app.querySelector('.pg h2');if(t){const h1=document.createElement('h1');h1.className=t.className;h1.setAttribute('style',t.getAttribute('style')||'');h1.innerHTML=t.innerHTML;t.replaceWith(h1)}const hh=app.querySelector('h1');document.title=(hh?hh.textContent+' | ':'')+'Sreekrishna Textiles';if(lastH&&!same&&!_aid)app.focus({preventScroll:true})}if(k=='c'||k=='s'){const key=k=='s'?'s':h[1]||'sarees';bindF(key,()=>{const y=scrollY;route();scrollTo(0,y)})}
 if(!k){petals($('#pt'));$('#hero').classList.add('on');$('#hv').style.display='none';if(!ready){ready=true}else{$('#hb').style.transform='none'}auto=setInterval(tick,7000)}
 $$('#nv a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')==(k?'#/'+h[0]+'/'+(h[1]||''):'#/')));counts();reveal();lastK=k;lastH=location.hash;scrollTo(0,same?y0:0)}
 addEventListener('hashchange',route);
