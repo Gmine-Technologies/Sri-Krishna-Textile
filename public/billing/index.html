@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Purchase System - Dashboard & Loyalty Management</title>
+    <script>
+      (function() {
+        var p = window.location.pathname;
+        if (p === '/billing' || p === '/billing/' || p === '' || p === '/') {
+          window.history.replaceState(null, '', '/dashboard');
+        } else if (p.startsWith('/billing/')) {
+          var sub = p.replace(/^\/billing\/?/, '/');
+          window.history.replaceState(null, '', sub === '/' ? '/dashboard' : sub);
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-DNIz4TdU.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DZShe8ki.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

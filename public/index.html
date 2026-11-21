@@ -124,8 +124,11 @@ select,.panel input,.panel select,.bar input{color:var(--ink);background:#fff}.b
 .evs{list-style:none;padding:0;margin:0}.evs li{padding:10px 0;border-bottom:1px solid #eadccf}.evs li.new{background:#fff6e0;padding-left:8px;border-left:3px solid var(--gold)}
 .bdg{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;background:#eddcd0}.b-Processing{background:#fff1c9;color:#6b4e00}.b-Shipped{background:#dbeafe;color:#1d4ed8}.b-OutforDelivery{background:#e0e7ff;color:#3730a3}.b-Delivered{background:#d9f3e6;color:#0a6b43}.b-Cancelled{background:#fde1e5;color:#b3122a}
 .panel label{display:block;font-size:13px;color:#6b5550;margin-top:4px}.fx{flex:1 1 170px;width:auto!important;margin:0!important}code{background:#f3e8dc;padding:1px 6px;border-radius:4px}
-@media print{header,footer,#bn,.noprint,.skip,#skip,#toast,.steps,canvas,#live{display:none!important}.pg{padding:10px!important}.panel{box-shadow:none;border:1px solid #ccc}.two{grid-template-columns:1fr 1fr!important}}
-</style><script src="qrcode.min.js"></script>
+@media print{header,footer,#bn,.noprint,.skip,#skip,#toast,.steps,canvas,#live,#hd,#burger,#sb,#ub,.bar button{display:none!important}body{background:#fff!important;color:#000!important;padding:0!important;margin:0!important}body.has-pos-modal > *:not(#app),body.has-pos-modal #app > *:not(.pos-modal-backdrop),body.has-pos-modal .pg > *:not(.pos-modal-backdrop),body.has-pos-modal .panel:not(.pos-modal-card),body.has-pos-modal .two,body.has-pos-modal h1,body.has-pos-modal p.sub,body.has-pos-modal .kp{display:none!important}.pg{padding:0!important;max-width:100%!important;margin:0!important}.panel{box-shadow:none!important;border:none!important;padding:0!important}.two{grid-template-columns:1fr 1fr!important}.pos-modal-backdrop{position:static!important;background:none!important;padding:0!important;display:block!important}.pos-modal-card{box-shadow:none!important;border:none!important;max-width:100%!important;width:100%!important;margin:0!important;border-radius:0!important}#print_area,#report_print_area{padding:0!important;max-width:100%!important;width:100%!important;border:none!important}}
+</style>
+<script src="qrcode.min.js"></script>
+<script src="jspdf.min.js"></script>
+<script src="jspdf.autotable.min.js"></script>
 </head><body><a class="skip" href="#app">Skip to main content</a><div id="live" class="sr" aria-live="polite"></div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="lgG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8f1440"/><stop offset="1" stop-color="#4a0a22"/></linearGradient><linearGradient id="lgT" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe9a8"/><stop offset=".55" stop-color="#e9bd5c"/><stop offset="1" stop-color="#b8862e"/></linearGradient>
 <symbol id="lg" viewBox="0 0 260 112"><path d="M14 44Q14 28 34 28H104Q120 28 130 17Q140 28 156 28H226Q246 28 246 44V84Q246 104 226 104H34Q14 104 14 84Z" fill="url(#lgG)" stroke="url(#lgT)" stroke-width="4"/><path d="M21 45Q21 34 36 34H104Q121 34 130 24Q139 34 156 34H224Q239 34 239 45V83Q239 97 224 97H36Q21 97 21 83Z" fill="none" stroke="#e9bd5c" stroke-width="1.2" opacity=".85"/>
@@ -170,7 +173,7 @@ const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const ST=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(k)||'null');localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}};
 const IP={"heart": "<path d=\"M12 20.5s-8-4.9-8-11A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 8 2.5c0 6.1-8 11-8 11z\"/>", "cart": "<path d=\"M3 4h2.5l2.2 10.5h9.6l2-7.5H6.5\"/><circle cx=\"9\" cy=\"19\" r=\"1.4\"/><circle cx=\"17\" cy=\"19\" r=\"1.4\"/>", "search": "<circle cx=\"11\" cy=\"11\" r=\"6.5\"/><path d=\"M16 16l5 5\"/>", "shield": "<path d=\"M12 3l7.5 3v5.5c0 4.5-3.2 8-7.5 9.5-4.3-1.5-7.5-5-7.5-9.5V6z\"/><path d=\"M8.5 12l2.5 2.5 4.5-5\"/>", "truck": "<path d=\"M2 6h11v10H2z\"/><path d=\"M13 9h4l3 3v4h-7\"/><circle cx=\"6.5\" cy=\"17.5\" r=\"1.8\"/><circle cx=\"16.5\" cy=\"17.5\" r=\"1.8\"/>", "ret": "<path d=\"M4 12a8 8 0 0 1 14-5.3L20 9\"/><path d=\"M20 4v5h-5\"/><path d=\"M20 12a8 8 0 0 1-14 5.3L4 15\"/><path d=\"M4 20v-5h5\"/>", "head": "<path d=\"M4 14v-2a8 8 0 0 1 16 0v2\"/><rect x=\"3\" y=\"14\" width=\"4\" height=\"6\" rx=\"1.5\"/><rect x=\"17\" y=\"14\" width=\"4\" height=\"6\" rx=\"1.5\"/><path d=\"M19 20c0 1.5-2 2-5 2\"/>", "home": "<path d=\"M4 11l8-7 8 7v9h-5v-6H9v6H4z\"/>", "grid": "<rect x=\"4\" y=\"4\" width=\"7\" height=\"7\"/><rect x=\"13\" y=\"4\" width=\"7\" height=\"7\"/><rect x=\"4\" y=\"13\" width=\"7\" height=\"7\"/><rect x=\"13\" y=\"13\" width=\"7\" height=\"7\"/>", "spark": "<path d=\"M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z\"/>", "down": "<path d=\"M6 8l6 6 6-6\"/><path d=\"M6 14l6 6 6-6\"/>", "ig": "<rect x=\"3.5\" y=\"3.5\" width=\"17\" height=\"17\" rx=\"5\"/><circle cx=\"12\" cy=\"12\" r=\"4\"/><circle cx=\"17\" cy=\"7\" r=\".8\"/>", "fb": "<path d=\"M14 8h2V4.5h-2.5A3.5 3.5 0 0 0 10 8v2H8v3.5h2V20h3.5v-6.5H16l.5-3.5h-3V8.5c0-.3.2-.5.5-.5z\"/>", "yt": "<rect x=\"2.5\" y=\"5.5\" width=\"19\" height=\"13\" rx=\"4\"/><path d=\"M10 9.5v5l4.5-2.5z\"/>", "wa": "<path d=\"M3.5 20.5l1.4-4.3A8.5 8.5 0 1 1 8 19.3z\"/><path d=\"M9 8.5c0 3.5 3 6.5 6.5 6.5l1-1.5-2-1-1 .8c-1-.4-2-1.4-2.4-2.4l.8-1-1-2z\"/>", "pin": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M10.5 20l1.8-7.5\"/><path d=\"M9.2 11.2a3 3 0 1 1 3.3 3\"/>"};function I(n){return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">'+IP[n]+'</svg>'}
 const COL={Pink:'#d6246e',Red:'#b3122a',Green:'#0f7a55',Blue:'#1c4fa0',Purple:'#6b2d8f',Gold:'#c9a227',Maroon:'#6a0f2b',Black:'#1d1d1d',Yellow:'#e8b923'};
-const CK=Object.keys(COL),inr=n=>'₹'+(Number(n)||0).toLocaleString('en-IN'),effPr=p=>p?((p.cost&&p.cost<p.price)?p.cost:(p.disc?Math.max(1,Math.round((p.price||0)*(1-(p.disc||0)/100))):(p.price||0))):0,mrpPr=p=>p?(p.disc?(p.price||0):(p.mrp||p.price||0)):0;let adminUnlocked=false;const VID='';
+const CK=Object.keys(COL),inr=n=>'₹'+(Number(n)||0).toLocaleString('en-IN'),effPr=p=>p?((p.cost&&p.cost<p.price)?p.cost:(p.disc?Math.max(1,Math.round((p.price||0)*(1-(p.disc||0)/100))):(p.price||0))):0,mrpPr=p=>p?(p.disc?(p.price||0):(p.mrp||p.price||0)):0;const R=(i,m)=>((Number(i)||0)*7919+13)%(m||100);let adminUnlocked=false;const VID='';
 let cart=ST('cart')||[],wish=ST('wish')||[],orders=ST('orders')||[],recent=ST('recent')||[],tries=ST('tries')||0,user=ST('user');
 /* ---------- demo data ---------- */
 const P=[];
@@ -1460,6 +1463,7 @@ return `<div class="pg auth"><section class="stage" aria-label="Admin console"><
 <div class="panel authp"><h2>Admin Login</h2><p class="sub">Restricted area for store administrators.</p><input id="e" type="email" aria-label="Admin Email" placeholder="Admin Email" value="${!API?ADM.e:''}"><input id="pw" type="password" aria-label="Password" placeholder="Password" value="${!API?ADM.p:''}" onkeydown="if(event.key==='Enter')doAdminAuth()"><p class="sub">${API?'Use your admin email and password.':'Demo admin login is pre-filled: admin@sreekrishna.demo / admin123'}</p><button class="btn" onclick="doAdminAuth()">Login as Admin</button><p style="margin-top:14px"><a href="#/" style="color:var(--mag)">← Back to Store</a></p></div></div>`}
 function doAdminAuth(){const e=$('#e').value.trim(),pw=$('#pw').value;if(!e)return toast('Enter admin email');if(!pw)return toast('Enter password');
 if(e.toLowerCase()!=ADM.e||pw!=ADM.p)return toast('Invalid admin credentials');adminUnlocked=true;user={name:'Admin',email:ADM.e,role:'admin'};
+try{localStorage.setItem('user_info',JSON.stringify({id:1,username:'admin',email:ADM.e,first_name:'Admin',last_name:'',is_staff:true,is_superuser:true}));if(typeof TOK!=='undefined'&&TOK)localStorage.setItem('access_token',TOK)}catch(_){}
 ST('user',user);toast('Welcome, '+user.name);route()}
 let TRK=null,oq='',ofl='';
 const fT=t=>t?new Date(t).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'';
@@ -1506,8 +1510,1553 @@ function monthly(){if(API&&ADMC.months)return ADMC.months;const live=orders.filt
 function chart(M){const W=720,H=270,pd=40,mx=Math.max(...M.map(x=>x.sales)),mn=Math.min(0,...M.map(x=>x.net)),sc=v=>pd+(H-2*pd)*(1-(v-mn)/(mx-mn)),y0=sc(0),bw=(W-pd*2)/M.length;
 return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Monthly sales and net profit or loss chart. Full figures are in the Profit and Loss tab." style="width:100%"><line x1="${pd}" x2="${W-pd}" y1="${y0}" y2="${y0}" stroke="#999"/>${M.map((d,i)=>{const x=pd+i*bw;return `<rect x="${x+bw*.1}" y="${sc(d.sales)}" width="${bw*.35}" height="${y0-sc(d.sales)}" fill="#c9a24a"/><rect x="${x+bw*.5}" y="${Math.min(y0,sc(d.net))}" width="${bw*.35}" height="${Math.max(1,Math.abs(sc(d.net)-y0))}" fill="${d.net<0?'#b3122a':'#0a7a4b'}"/><text x="${x+bw/2}" y="${H-12}" text-anchor="middle" font-size="12" fill="#3a1f1a">${d.m}</text>`}).join('')}<text x="${pd}" y="16" font-size="12" fill="#3a1f1a">Gold = Sales · Green = Net profit · Red = Net loss</text></svg>`}
 function deny(){return `<div class="pg"><h2>Admin access only</h2><div class="panel" style="max-width:480px"><p>You are signed in as a customer (${esc(user.email)}). Please sign in with an admin account to access the Admin Panel.</p><p style="margin-top:14px"><button class="btn" onclick="logout();route()">Log in as Admin</button> <a class="btn o" href="#/">Back to Store</a></p></div></div>`}
-function admin(tab,arg){if(!adminUnlocked)return adminAuth();if(!user||user.role!='admin')return adminAuth();tab=tab||'dash';const T=[['dash','Dashboard'],['products','Products & Stock'],['orders','Orders'],['customers','Customers'],['pl','Profit & Loss'],['settings','Profile & Settings']];
-return `<div class="pg"><h2>Admin Panel</h2><p class="sub">Signed in as ${user.email}. ${API?'Connected to the live database.':'Edits save in this browser and update the storefront immediately (demo storage, no server).'}</p><div class="steps" role="navigation" aria-label="Admin sections">${T.map(([k,n])=>`<a href="#/admin/${k}" class="rb ${(k==tab||(k=='orders'&&tab=='order'))?'on':''}"${(k==tab||(k=='orders'&&tab=='order'))?' aria-current="page"':''}>${n}</a>`).join('')}<button type="button" class="rb" onclick="logout();location.hash='#/'">Logout</button></div>${({dash:aDash,products:aProd,orders:aOrd,customers:aCus,pl:aPL,settings:aSet,order:()=>aOrder(arg)}[tab]||aDash)()}</div>`}
+function admin(tab,arg){if(!adminUnlocked)return adminAuth();if(!user||user.role!='admin')return adminAuth();tab=tab||'dash';const T=[['dash','Dashboard'],['products','Products & Stock'],['orders','Orders'],['customers','Customers'],['pl','Profit & Loss'],['settings','Profile & Settings'],['bill','Bill']];
+return `<div class="pg"><h2>Admin Panel</h2><p class="sub">Signed in as ${user.email}. ${API?'Connected to the live database.':'Edits save in this browser and update the storefront immediately (demo storage, no server).'}</p><div class="steps" role="navigation" aria-label="Admin sections">${T.map(([k,n])=>`<a href="#/admin/${k}" class="rb ${(k==tab||(k=='orders'&&tab=='order'))?'on':''}"${(k==tab||(k=='orders'&&tab=='order'))?' aria-current="page"':''}>${n}</a>`).join('')}<button type="button" class="rb" onclick="logout();location.hash='#/'">Logout</button></div>${({dash:aDash,products:aProd,orders:aOrd,customers:aCus,pl:aPL,settings:aSet,order:()=>aOrder(arg),bill:aBill}[tab]||aDash)()}</div>`}
+
+let posTab = 'terminal';
+let posCart = [];
+let posPrintingBill = null;
+let posEditingBill = null;
+let posCustSearch = '';
+let posInvSearch = '';
+let posRepFrom = '';
+let posRepTo = '';
+let posRepSearch = '';
+let posPrintingReport = false;
+let posSyncing = false;
+
+function getStoreBills() {
+  let b = ST('store_bills');
+  if (!b || !b.length) {
+    b = [
+      {
+        id: 'INV-2026-000001',
+        date: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+        iso: new Date().toISOString(),
+        customer: { name: 'Priya Sharma', phone: '9876543210', code: 'CUST-0001' },
+        items: [{ id: 'SK1000', name: 'Royal Magenta Kanchipuram Silk Saree', price: 3500, qty: 1 }],
+        subtotal: 3500,
+        discount: 0,
+        discountPct: 0,
+        finalAmount: 3500,
+        points: 35,
+        payMode: 'UPI',
+        custPointsAfter: 35
+      }
+    ];
+    ST('store_bills', b);
+  }
+  b.forEach(bill => {
+    if (!bill.items || !Array.isArray(bill.items) || bill.items.length === 0) {
+      bill.items = [{ name: 'Store Garment / Saree', price: Number(bill.finalAmount) || 0, qty: 1 }];
+    }
+  });
+  return b;
+}
+
+function getStoreCusts() {
+  let c = ST('store_custs');
+  if (!c || !c.length) {
+    c = [
+      { code: 'CUST-0001', name: 'Priya Sharma', phone: '9876543210', points: 35, totalSpent: 3500, billsCount: 1 }
+    ];
+    ST('store_custs', c);
+  }
+  return c;
+}
+
+async function syncPosWithDb() {
+  if (posSyncing) return;
+  posSyncing = true;
+  const base = window.API_BASE || (location.protocol === 'http:' || location.protocol === 'https:' ? '' : 'http://localhost:3000');
+  try {
+    const c = new AbortController();
+    setTimeout(() => c.abort(), 2500);
+    const bills = getStoreBills();
+    const res = await fetch(base + '/api/pos/sync-bills/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(typeof TOK !== 'undefined' && TOK ? { 'Authorization': 'Bearer ' + TOK } : {})
+      },
+      body: JSON.stringify({ bills }),
+      signal: c.signal
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.bills && data.bills.length) {
+        ST('store_bills', data.bills);
+        const custs = getStoreCusts();
+        for (const b of data.bills) {
+          if (b.customer && b.customer.phone) {
+            let cu = custs.find(x => x.phone === b.customer.phone);
+            if (!cu) {
+              cu = {
+                code: b.customer.code || ('CUST-' + String(custs.length + 1).padStart(4, '0')),
+                name: b.customer.name,
+                phone: b.customer.phone,
+                points: b.custPointsAfter || b.points || 0,
+                totalSpent: b.finalAmount,
+                billsCount: 1
+              };
+              custs.push(cu);
+            } else {
+              cu.name = b.customer.name;
+              if (b.custPointsAfter) cu.points = b.custPointsAfter;
+            }
+          }
+        }
+        ST('store_custs', custs);
+      }
+    }
+  } catch (err) {
+    // offline mode or backend offline
+  } finally {
+    posSyncing = false;
+  }
+}
+
+function aBill() {
+  syncPosWithDb();
+  const bills = getStoreBills();
+  const custs = getStoreCusts();
+  const todaySales = bills.reduce((sum, b) => sum + (Number(b.finalAmount) || 0), 0);
+  const totalPoints = custs.reduce((sum, c) => sum + (Number(c.points) || 0), 0);
+  const isServer = API || (location.protocol === 'http:' || location.protocol === 'https:');
+
+  const tabs = [
+    ['terminal', '⚡ POS Billing Counter'],
+    ['invoices', '📋 Invoices & History (' + bills.length + ')'],
+    ['customers', '👥 Customer Directory (' + custs.length + ')'],
+    ['reports', '📊 Total Bills & Reports (' + bills.length + ')']
+  ];
+
+  return `<div style="margin-top:16px">
+    <div style="background:#fff;padding:16px 22px;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,0.04);margin-bottom:16px;border:1px solid #ebd8ca">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+        <div>
+          <h3 style="margin:0;color:#5a0f2a;font-family:Georgia,serif;font-size:20px">Store Billing & POS System</h3>
+          <p style="margin:2px 0 0;font-size:12.5px;color:#777">Direct counter billing, instant invoice generation, edit bills, date-wise reports and customer loyalty points (₹100 = 1 pt).</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:12px;padding:4px 10px;border-radius:20px;font-weight:600;background:#e6f7ec;color:#0a7a4b;border:1px solid #b2e8c4">
+            🟢 Live Database Synced
+          </span>
+          <button type="button" class="btn o" onclick="syncPosWithDb().then(()=>{toast('Synced with database ✓');route()})" style="padding:4px 10px;font-size:11.5px">🔄 Sync DB</button>
+        </div>
+      </div>
+
+      <div class="kp" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">
+        <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px"><b style="color:#5a0f2a;font-size:20px">${inr(todaySales)}</b>Total Sales</div>
+        <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px"><b style="color:#0a7a4b;font-size:20px">${bills.length}</b>Bills Issued</div>
+        <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px"><b style="color:#c9a24a;font-size:20px">+${totalPoints} pts</b>Loyalty Awarded</div>
+        <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px"><b style="color:#5a0f2a;font-size:20px">${custs.length}</b>Active Customers</div>
+      </div>
+
+      <div class="steps" style="margin:0">
+        ${tabs.map(([k, label]) => `<a href="javascript:void(0)" onclick="posTab='${k}';route()" class="rb ${posTab === k ? 'on' : ''}">${label}</a>`).join('')}
+      </div>
+    </div>
+
+    ${posTab === 'terminal' ? renderPosTerminal() : (posTab === 'invoices' ? renderPosInvoices() : (posTab === 'customers' ? renderPosCustomers() : renderPosReports()))}
+    ${posPrintingBill ? renderPosPrintModal() : ''}
+    ${posEditingBill ? renderPosEditModal() : ''}
+    ${posPrintingReport ? renderPosReportPrintModal() : ''}
+  </div>`;
+}
+
+function renderPosTerminal() {
+  const custs = getStoreCusts();
+  const subtotal = posCart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const discountVal = 0;
+  const finalVal = Math.max(0, subtotal - discountVal);
+  const pointsVal = Math.floor(finalVal / 100);
+
+  return `<div class="two" style="gap:20px;align-items:flex-start">
+    <div class="panel" style="background:#fff">
+      <h3 style="color:#5a0f2a;margin-bottom:12px">1. Customer & Product Details</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;color:#444">Customer Phone (10 Digits)</label>
+          <input id="pos_cphone" type="tel" inputmode="numeric" placeholder="e.g. 9876543210" oninput="posCheckExistingCust(this.value)" style="margin-bottom:4px">
+          <small id="pos_cust_hint" style="color:#0a7a4b;font-weight:600;display:block;min-height:16px"></small>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;color:#444">Customer Name</label>
+          <input id="pos_cname" type="text" placeholder="Full Name" style="margin-bottom:4px">
+          <small style="color:#888;display:block;min-height:16px">New or existing store customer</small>
+        </div>
+      </div>
+
+      <hr style="border:none;border-top:1px solid #ebd8ca;margin:16px 0">
+
+      <h4 style="color:#5a0f2a;margin-bottom:10px">Add Saree / Item to Bill</h4>
+      <div style="margin-bottom:10px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;color:#444">Select Saree / Product</label>
+        <select id="pos_prod_sel" onchange="posFillProductPrice(this.value)" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc;background:#fff;font-size:13px">
+          <option value="">-- Choose from Store Catalog (${P.length} items) --</option>
+          ${P.slice(0, 40).map(p => `<option value="${p.id}" data-name="${esc(p.name)}" data-price="${p.price}">${esc(p.name)} (${p.col || ''}) - ${inr(p.price)}</option>`).join('')}
+          <option value="CUSTOM">★ Custom Item / Other Garment</option>
+        </select>
+      </div>
+
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:12px">
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;color:#444">Item Name</label>
+          <input id="pos_item_name" type="text" placeholder="Saree or product name">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;color:#444">Unit Price (₹)</label>
+          <input id="pos_item_price" type="number" min="0" placeholder="Price">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;color:#444">Quantity</label>
+          <input id="pos_item_qty" type="number" min="1" value="1">
+        </div>
+      </div>
+
+      <button type="button" class="btn" onclick="posAddItemToCart()" style="background:#5a0f2a;color:#fff;width:100%">+ Add Item to Current Bill</button>
+    </div>
+
+    <div class="panel" style="background:#fff">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 style="color:#5a0f2a;margin:0">2. Current Bill Items</h3>
+        <span style="font-size:12px;font-weight:700;background:#fdf8f5;color:#5a0f2a;padding:4px 8px;border-radius:6px;border:1px solid #ebd8ca">
+          ${posCart.length} Item(s)
+        </span>
+      </div>
+
+      ${posCart.length ? `
+        <div style="overflow-x:auto;margin-bottom:16px">
+          <table style="width:100%;font-size:12.5px">
+            <tr style="border-bottom:2px solid #eee">
+              <th style="text-align:left;padding:6px 4px">Item</th>
+              <th style="text-align:center;padding:6px 4px">Qty</th>
+              <th style="text-align:right;padding:6px 4px">Price</th>
+              <th style="text-align:right;padding:6px 4px">Total</th>
+              <th></th>
+            </tr>
+            ${posCart.map((it, idx) => `
+              <tr style="border-bottom:1px solid #f2f2f2">
+                <td style="padding:8px 4px"><b>${esc(it.name)}</b></td>
+                <td style="text-align:center;padding:8px 4px">${it.qty}</td>
+                <td style="text-align:right;padding:8px 4px">${inr(it.price)}</td>
+                <td style="text-align:right;padding:8px 4px"><b>${inr(it.price * it.qty)}</b></td>
+                <td style="text-align:right;padding:8px 4px">
+                  <button type="button" onclick="posRemoveItem(${idx})" style="background:none;border:none;color:#b3122a;cursor:pointer;font-size:14px" title="Remove">&times;</button>
+                </td>
+              </tr>
+            `).join('')}
+          </table>
+        </div>
+      ` : `
+        <div style="text-align:center;padding:32px 16px;background:#fdfaf7;border-radius:10px;border:1px dashed #ebd8ca;margin-bottom:16px;color:#888">
+          <p style="margin:0;font-size:13px">No items added yet. Select a product on the left to begin billing.</p>
+        </div>
+      `}
+
+      <div style="background:#fdf8f4;border-radius:10px;padding:12px 14px;border:1px solid #ebd8ca;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px">
+          <span>Subtotal:</span><b>${inr(subtotal)}</b>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px">
+          <span style="font-weight:600;color:#5a0f2a">Discount (%):</span>
+          <div style="display:flex;align-items:center;gap:4px">
+            <input id="pos_disc_pct" type="number" min="0" max="100" step="0.5" value="0" placeholder="0" oninput="posUpdateDiscountPct(this.value)" style="width:75px;padding:4px 8px;font-size:13px;text-align:right;margin:0;border:1px solid #ccc;border-radius:6px">
+            <span style="font-weight:700;color:#5a0f2a">%</span>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px">
+          <span style="font-weight:600;color:#5a0f2a">Discount (₹):</span>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span style="font-weight:700;color:#5a0f2a">₹</span>
+            <input id="pos_disc" type="number" min="0" value="0" placeholder="0" oninput="posUpdateDiscountAmt(this.value)" style="width:85px;padding:4px 8px;font-size:13px;text-align:right;margin:0;border:1px solid #ccc;border-radius:6px">
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px">
+          <span>Payment Method:</span>
+          <select id="pos_pay" style="padding:4px 8px;font-size:12.5px;border-radius:6px;border:1px solid #ccc;background:#fff">
+            <option value="Cash">Cash</option>
+            <option value="UPI">UPI / GPay / PhonePe</option>
+            <option value="Card">Credit / Debit Card</option>
+            <option value="Net Banking">Net Banking</option>
+          </select>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:17px;font-weight:700;color:#5a0f2a;border-top:1px solid #ebd8ca;padding-top:8px">
+          <span>Final Bill Amount:</span>
+          <span id="pos_grand_total">${inr(finalVal)}</span>
+        </div>
+      </div>
+
+      <div style="background:#eafaf1;border:1px solid #a3e9be;border-radius:10px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:12.5px;color:#0e623b;font-weight:600">⚡ Loyalty Points Earned:</span>
+        <b id="pos_points_badge" style="font-size:15px;color:#0a7a4b">+${pointsVal} pts (₹100 = 1 pt)</b>
+      </div>
+
+      <div style="display:flex;gap:10px">
+        <button type="button" class="btn o" onclick="posCreateBill(false)" style="flex:1" ${!posCart.length ? 'disabled' : ''}>Save Bill</button>
+        <button type="button" class="btn" onclick="posCreateBill(true)" style="flex:1;background:var(--mag);color:#fff" ${!posCart.length ? 'disabled' : ''}>🖨 Save &amp; Print Invoice</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function posUpdateDiscountPct(val) {
+  const subtotal = posCart.reduce((sum, it) => sum + it.price * it.qty, 0);
+  const pct = Math.max(0, Math.min(100, parseFloat(val) || 0));
+  const discAmt = subtotal > 0 ? Math.round(subtotal * (pct / 100)) : 0;
+  const discEl = $('#pos_disc');
+  if (discEl) discEl.value = discAmt;
+  posUpdateTotals();
+}
+
+function posUpdateDiscountAmt(val) {
+  const subtotal = posCart.reduce((sum, it) => sum + it.price * it.qty, 0);
+  const discAmt = Math.max(0, parseFloat(val) || 0);
+  const pct = subtotal > 0 ? +((discAmt / subtotal) * 100).toFixed(1) : 0;
+  const pctEl = $('#pos_disc_pct');
+  if (pctEl) pctEl.value = pct > 0 ? pct : 0;
+  posUpdateTotals();
+}
+
+function posUpdateTotals() {
+  const subtotal = posCart.reduce((sum, it) => sum + it.price * it.qty, 0);
+  const discAmt = Math.max(0, +($('#pos_disc') ? $('#pos_disc').value : 0) || 0);
+  const finalVal = Math.max(0, subtotal - discAmt);
+  const pointsVal = Math.floor(finalVal / 100);
+
+  const gEl = $('#pos_grand_total');
+  if (gEl) gEl.textContent = inr(finalVal);
+  const pEl = $('#pos_points_badge');
+  if (pEl) pEl.textContent = '+' + pointsVal + ' pts (₹100 = 1 pt)';
+}
+
+function posFilterInvoicesLive(query) {
+  posInvSearch = query;
+  const q = (query || '').toLowerCase().trim();
+  const rows = document.querySelectorAll('.inv-bill-row');
+  rows.forEach(r => {
+    const text = r.getAttribute('data-search') || '';
+    r.style.display = (!q || text.includes(q)) ? '' : 'none';
+  });
+}
+
+function posFilterCustomersLive(query) {
+  posCustSearch = query;
+  const q = (query || '').toLowerCase().trim();
+  const rows = document.querySelectorAll('.cust-row');
+  rows.forEach(r => {
+    const text = r.getAttribute('data-search') || '';
+    r.style.display = (!q || text.includes(q)) ? '' : 'none';
+  });
+}
+
+function renderPosInvoices() {
+  const bills = getStoreBills();
+  const q = posInvSearch.toLowerCase().trim();
+  const filtered = bills.filter(b => !q || (b.id + ' ' + (b.customer ? b.customer.name + ' ' + b.customer.phone : '')).toLowerCase().includes(q));
+
+  return `<div class="panel" style="background:#fff">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+      <h3 style="color:#5a0f2a;margin:0">Store Invoice Records (${bills.length})</h3>
+      <input id="inv_search_input" type="text" placeholder="Search by Invoice #, Customer or Phone..." value="${esc(posInvSearch)}" oninput="posFilterInvoicesLive(this.value)" style="max-width:320px;padding:8px 12px;margin:0">
+    </div>
+
+    ${filtered.length ? `
+      <div style="overflow-x:auto">
+        <table style="width:100%;font-size:13px">
+          <thead>
+            <tr style="border-bottom:2px solid #ebd8ca">
+              <th style="text-align:left;padding:10px 8px">Invoice #</th>
+              <th style="text-align:left;padding:10px 8px">Date</th>
+              <th style="text-align:left;padding:10px 8px">Customer</th>
+              <th style="text-align:left;padding:10px 8px">Phone</th>
+              <th style="text-align:center;padding:10px 8px">Items</th>
+              <th style="text-align:right;padding:10px 8px">Amount</th>
+              <th style="text-align:center;padding:10px 8px">Points</th>
+              <th style="text-align:center;padding:10px 8px">Pay</th>
+              <th style="text-align:right;padding:10px 8px">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filtered.map(b => `
+              <tr class="inv-bill-row" data-search="${esc((b.id + ' ' + (b.customer ? b.customer.name + ' ' + b.customer.phone : '')).toLowerCase())}" style="border-bottom:1px solid #f2f2f2">
+                <td style="padding:10px 8px"><b style="color:#5a0f2a">${b.id}</b></td>
+                <td style="padding:10px 8px;color:#666">${b.date}</td>
+                <td style="padding:10px 8px"><b>${esc(b.customer ? b.customer.name : 'Walk-in')}</b></td>
+                <td style="padding:10px 8px;color:#555">${esc(b.customer ? b.customer.phone : '-')}</td>
+                <td style="text-align:center;padding:10px 8px">${(b.items || []).reduce((sum, it) => sum + (Number(it.qty) || 1), 0)}</td>
+                <td style="text-align:right;padding:10px 8px"><b style="color:#5a0f2a">${inr(b.finalAmount)}</b></td>
+                <td style="text-align:center;padding:10px 8px"><span style="background:#eafaf1;color:#0a7a4b;font-weight:700;padding:2px 6px;border-radius:4px">+${b.points || 0} pts</span></td>
+                <td style="text-align:center;padding:10px 8px"><span style="font-size:11px;background:#f5efe8;padding:2px 6px;border-radius:4px">${b.payMode || 'Cash'}</span></td>
+                <td style="text-align:right;padding:10px 8px;white-space:nowrap">
+                  <button type="button" class="btn o" onclick="posOpenEditBill('${b.id}')" style="padding:4px 8px;font-size:11px;margin-right:6px">✏ Edit</button>
+                  <button type="button" class="btn o" onclick="downloadPosInvoicePDF('${b.id}')" style="padding:4px 8px;font-size:11px;margin-right:6px;background:#eafaf1;color:#0a7a4b;border-color:#b8e6ce">📥 PDF</button>
+                  <button type="button" class="btn o" onclick="posOpenInvoice('${b.id}')" style="padding:4px 10px;font-size:11px">🖨 Print Invoice</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    ` : `<p style="padding:24px 0;text-align:center;color:#888">No matching invoices found.</p>`}
+  </div>`;
+}
+
+function renderPosCustomers() {
+  const custs = getStoreCusts();
+  const q = posCustSearch.toLowerCase().trim();
+  const filtered = custs.filter(c => !q || (c.name + ' ' + c.phone + ' ' + c.code).toLowerCase().includes(q));
+
+  return `<div class="panel" style="background:#fff">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+      <h3 style="color:#5a0f2a;margin:0">Customer Directory & Loyalty Ledger (${custs.length})</h3>
+      <input id="cust_search_input" type="text" placeholder="Search customer by name, phone or code..." value="${esc(posCustSearch)}" oninput="posFilterCustomersLive(this.value)" style="max-width:320px;padding:8px 12px;margin:0">
+    </div>
+
+    ${filtered.length ? `
+      <div style="overflow-x:auto">
+        <table style="width:100%;font-size:13px">
+          <thead>
+            <tr style="border-bottom:2px solid #ebd8ca">
+              <th style="text-align:left;padding:10px 8px">Customer Code</th>
+              <th style="text-align:left;padding:10px 8px">Customer Name</th>
+              <th style="text-align:left;padding:10px 8px">Phone Number</th>
+              <th style="text-align:center;padding:10px 8px">Bills Count</th>
+              <th style="text-align:right;padding:10px 8px">Total Spent</th>
+              <th style="text-align:center;padding:10px 8px">Loyalty Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filtered.map(c => `
+              <tr class="cust-row" data-search="${esc((c.name + ' ' + c.phone + ' ' + c.code).toLowerCase())}" style="border-bottom:1px solid #f2f2f2">
+                <td style="padding:10px 8px"><code style="background:#fdf8f4;padding:2px 6px;border-radius:4px;color:#5a0f2a;font-weight:700">${c.code}</code></td>
+                <td style="padding:10px 8px"><b>${esc(c.name)}</b></td>
+                <td style="padding:10px 8px">${esc(c.phone)}</td>
+                <td style="text-align:center;padding:10px 8px">${c.billsCount || 1}</td>
+                <td style="text-align:right;padding:10px 8px"><b>${inr(c.totalSpent || 0)}</b></td>
+                <td style="text-align:center;padding:10px 8px">
+                  <span style="background:#eafaf1;color:#0a7a4b;font-weight:700;padding:4px 10px;border-radius:12px;border:1px solid #b7ebd0;display:inline-block">
+                    ★ ${c.points || 0} Points
+                  </span>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    ` : `<p style="padding:24px 0;text-align:center;color:#888">No matching customers found.</p>`}
+  </div>`;
+}
+
+function posSetDateFilter(type) {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const todayStr = `${yyyy}-${mm}-${dd}`;
+
+  if (type === 'today') {
+    posRepFrom = todayStr;
+    posRepTo = todayStr;
+  } else if (type === 'week') {
+    const day = now.getDay() || 7;
+    const mon = new Date(now);
+    mon.setDate(now.getDate() - day + 1);
+    const mY = mon.getFullYear();
+    const mM = String(mon.getMonth() + 1).padStart(2, '0');
+    const mD = String(mon.getDate()).padStart(2, '0');
+    posRepFrom = `${mY}-${mM}-${mD}`;
+    posRepTo = todayStr;
+  } else if (type === 'month') {
+    posRepFrom = `${yyyy}-${mm}-01`;
+    posRepTo = todayStr;
+  } else if (type === 'all') {
+    posRepFrom = '';
+    posRepTo = '';
+  }
+  route();
+}
+
+function getFilteredReportBills() {
+  const bills = getStoreBills();
+  const q = (posRepSearch || '').toLowerCase().trim();
+  return bills.filter(b => {
+    const bDate = b.iso ? b.iso.slice(0, 10) : '';
+    if (posRepFrom && bDate && bDate < posRepFrom) return false;
+    if (posRepTo && bDate && bDate > posRepTo) return false;
+    if (q) {
+      const hay = (b.id + ' ' + (b.customer ? b.customer.name + ' ' + b.customer.phone : '')).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function posFilterReportLive(query) {
+  posRepSearch = query;
+  const q = (query || '').toLowerCase().trim();
+  const rows = document.querySelectorAll('.rep-bill-row');
+  let visibleCount = 0;
+  let totalSales = 0;
+  let totalPoints = 0;
+  let totalItems = 0;
+  let totalSub = 0;
+  let totalDisc = 0;
+
+  rows.forEach(r => {
+    const text = r.getAttribute('data-search') || '';
+    const match = !q || text.includes(q);
+    r.style.display = match ? '' : 'none';
+    if (match) {
+      visibleCount++;
+      totalSales += parseFloat(r.getAttribute('data-amount') || 0);
+      totalPoints += parseInt(r.getAttribute('data-points') || 0, 10);
+      totalItems += parseInt(r.getAttribute('data-items') || 0, 10);
+      totalSub += parseFloat(r.getAttribute('data-subtotal') || 0);
+      totalDisc += parseFloat(r.getAttribute('data-discount') || 0);
+    }
+  });
+
+  const kSales = document.getElementById('rep_kpi_sales');
+  if (kSales) kSales.textContent = inr(totalSales);
+  const kCount = document.getElementById('rep_kpi_count');
+  if (kCount) kCount.textContent = visibleCount;
+  const kPts = document.getElementById('rep_kpi_points');
+  if (kPts) kPts.textContent = '+' + totalPoints + ' pts';
+  const kAvg = document.getElementById('rep_kpi_avg');
+  if (kAvg) kAvg.textContent = inr(visibleCount ? Math.round(totalSales / visibleCount) : 0);
+
+  const fCount = document.getElementById('rep_ft_count');
+  if (fCount) fCount.textContent = `TOTALS (${visibleCount} Bills)`;
+  const fItems = document.getElementById('rep_ft_items');
+  if (fItems) fItems.textContent = totalItems;
+  const fSub = document.getElementById('rep_ft_subtotal');
+  if (fSub) fSub.textContent = inr(totalSub);
+  const fDisc = document.getElementById('rep_ft_discount');
+  if (fDisc) fDisc.textContent = '-' + inr(totalDisc);
+  const fSales = document.getElementById('rep_ft_sales');
+  if (fSales) fSales.textContent = inr(totalSales);
+  const fPts = document.getElementById('rep_ft_points');
+  if (fPts) fPts.textContent = '+' + totalPoints + ' pts';
+
+  const noMatch = document.getElementById('rep_no_match');
+  if (noMatch) noMatch.style.display = (visibleCount === 0 && rows.length > 0) ? 'block' : 'none';
+  const ftRow = document.getElementById('rep_ft_row');
+  if (ftRow) ftRow.style.display = visibleCount === 0 ? 'none' : '';
+}
+
+function renderPosReports() {
+  const filtered = getFilteredReportBills();
+  const totalSales = filtered.reduce((s, b) => s + (Number(b.finalAmount) || 0), 0);
+  const totalPoints = filtered.reduce((s, b) => s + (Number(b.points) || 0), 0);
+  const avgBill = filtered.length ? Math.round(totalSales / filtered.length) : 0;
+
+  return `<div class="panel" style="background:#fff">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+      <div>
+        <h3 style="color:#5a0f2a;margin:0">Total Bills & Date-Wise Sales Reports</h3>
+        <p style="margin:2px 0 0;font-size:12.5px;color:#777">Filter bills by date range, analyze total sales, loyalty points, and download as Excel or PDF.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn" onclick="exportPosReportCSV()" style="background:#0a7a4b;color:#fff;font-size:12px;padding:7px 14px">📥 Download Excel (CSV)</button>
+        <button type="button" class="btn" onclick="downloadPosReportPDFDirect()" style="background:#5a0f2a;color:#fff;font-size:12px;padding:7px 14px">📥 Download PDF</button>
+        <button type="button" class="btn o" onclick="exportPosReportPDF()" style="font-size:12px;padding:7px 14px;color:#5a0f2a;border-color:#5a0f2a">🖨 Print / Preview Report</button>
+      </div>
+    </div>
+
+    <!-- Date Range Filter Bar -->
+    <div style="background:#fdf8f4;border:1px solid #ebd8ca;border-radius:12px;padding:14px;margin-bottom:18px">
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:12px;justify-content:space-between">
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <label style="font-size:12px;font-weight:700;color:#5a0f2a">From Date:</label>
+            <input id="pos_rep_from" type="date" value="${posRepFrom}" onchange="posRepFrom=this.value;route()" style="padding:6px 10px;font-size:12.5px;border:1px solid #ccc;border-radius:6px;background:#fff;margin:0">
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <label style="font-size:12px;font-weight:700;color:#5a0f2a">To Date:</label>
+            <input id="pos_rep_to" type="date" value="${posRepTo}" onchange="posRepTo=this.value;route()" style="padding:6px 10px;font-size:12.5px;border:1px solid #ccc;border-radius:6px;background:#fff;margin:0">
+          </div>
+          <div style="display:flex;gap:6px">
+            <button type="button" class="btn o" onclick="posSetDateFilter('today')" style="padding:4px 10px;font-size:11.5px">Today</button>
+            <button type="button" class="btn o" onclick="posSetDateFilter('week')" style="padding:4px 10px;font-size:11.5px">This Week</button>
+            <button type="button" class="btn o" onclick="posSetDateFilter('month')" style="padding:4px 10px;font-size:11.5px">This Month</button>
+            <button type="button" class="btn o" onclick="posSetDateFilter('all')" style="padding:4px 10px;font-size:11.5px">All Time</button>
+          </div>
+        </div>
+
+        <input id="rep_search_input" type="text" placeholder="Filter by invoice, customer, phone..." value="${esc(posRepSearch)}" oninput="posFilterReportLive(this.value)" style="max-width:260px;padding:6px 10px;font-size:12px;margin:0">
+      </div>
+    </div>
+
+    <!-- Filtered Summary KPI Cards -->
+    <div class="kp" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px">
+      <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px">
+        <b id="rep_kpi_sales" style="color:#5a0f2a;font-size:22px">${inr(totalSales)}</b>
+        Filtered Total Sales
+      </div>
+      <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px">
+        <b id="rep_kpi_count" style="color:#0a7a4b;font-size:22px">${filtered.length}</b>
+        Filtered Bills Count
+      </div>
+      <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px">
+        <b id="rep_kpi_points" style="color:#c9a24a;font-size:22px">+${totalPoints} pts</b>
+        Filtered Total Points
+      </div>
+      <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px">
+        <b id="rep_kpi_avg" style="color:#5a0f2a;font-size:22px">${inr(avgBill)}</b>
+        Average Bill Value
+      </div>
+    </div>
+
+    <!-- Filtered Bills Table -->
+    ${filtered.length ? `
+      <div style="overflow-x:auto">
+        <table style="width:100%;font-size:13px">
+          <thead>
+            <tr style="border-bottom:2px solid #ebd8ca;background:#fcf8f5">
+              <th style="text-align:left;padding:10px 8px">Invoice #</th>
+              <th style="text-align:left;padding:10px 8px">Date &amp; Time</th>
+              <th style="text-align:left;padding:10px 8px">Customer Name</th>
+              <th style="text-align:left;padding:10px 8px">Phone</th>
+              <th style="text-align:center;padding:10px 8px">Items</th>
+              <th style="text-align:right;padding:10px 8px">Subtotal</th>
+              <th style="text-align:right;padding:10px 8px">Discount</th>
+              <th style="text-align:right;padding:10px 8px">Final Amount</th>
+              <th style="text-align:center;padding:10px 8px">Points</th>
+              <th style="text-align:center;padding:10px 8px">Pay</th>
+              <th style="text-align:right;padding:10px 8px">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="rep_bills_tbody">
+            ${filtered.map(b => `
+              <tr class="rep-bill-row" data-search="${esc((b.id + ' ' + (b.customer ? b.customer.name + ' ' + b.customer.phone : '')).toLowerCase())}" data-amount="${b.finalAmount}" data-points="${b.points || 0}" data-items="${(b.items || []).reduce((sum, it) => sum + (Number(it.qty) || 1), 0)}" data-subtotal="${b.subtotal || b.finalAmount}" data-discount="${b.discount || 0}" style="border-bottom:1px solid #f2f2f2">
+                <td style="padding:10px 8px"><b style="color:#5a0f2a">${b.id}</b></td>
+                <td style="padding:10px 8px;color:#666">${b.date}</td>
+                <td style="padding:10px 8px"><b>${esc(b.customer ? b.customer.name : 'Walk-in')}</b></td>
+                <td style="padding:10px 8px;color:#555">${esc(b.customer ? b.customer.phone : '-')}</td>
+                <td style="text-align:center;padding:10px 8px">${(b.items || []).reduce((sum, it) => sum + (Number(it.qty) || 1), 0)}</td>
+                <td style="text-align:right;padding:10px 8px">${inr(b.subtotal || b.finalAmount)}</td>
+                <td style="text-align:right;padding:10px 8px;color:#0a7a4b">${b.discount ? '-' + inr(b.discount) : '₹0'}</td>
+                <td style="text-align:right;padding:10px 8px"><b style="color:#5a0f2a">${inr(b.finalAmount)}</b></td>
+                <td style="text-align:center;padding:10px 8px"><span style="background:#eafaf1;color:#0a7a4b;font-weight:700;padding:2px 6px;border-radius:4px">+${b.points || 0} pts</span></td>
+                <td style="text-align:center;padding:10px 8px"><span style="font-size:11px;background:#f5efe8;padding:2px 6px;border-radius:4px">${b.payMode || 'Cash'}</span></td>
+                <td style="text-align:right;padding:10px 8px;white-space:nowrap">
+                  <button type="button" class="btn o" onclick="posOpenEditBill('${b.id}')" style="padding:4px 8px;font-size:11px;margin-right:6px">✏ Edit</button>
+                  <button type="button" class="btn o" onclick="posOpenInvoice('${b.id}')" style="padding:4px 10px;font-size:11px">🖨 Print</button>
+                </td>
+              </tr>
+            `).join('')}
+            <tr id="rep_ft_row" style="border-top:2px solid #5a0f2a;background:#fdf8f5;font-weight:700">
+              <td id="rep_ft_count" colspan="4" style="padding:12px 8px;color:#5a0f2a">TOTALS (${filtered.length} Bills)</td>
+              <td id="rep_ft_items" style="text-align:center;padding:12px 8px">${filtered.reduce((s, b) => s + (b.items || []).reduce((is, it) => is + (Number(it.qty) || 1), 0), 0)}</td>
+              <td id="rep_ft_subtotal" style="text-align:right;padding:12px 8px">${inr(filtered.reduce((s, b) => s + (Number(b.subtotal) || Number(b.finalAmount) || 0), 0))}</td>
+              <td id="rep_ft_discount" style="text-align:right;padding:12px 8px;color:#0a7a4b">-${inr(filtered.reduce((s, b) => s + (Number(b.discount) || 0), 0))}</td>
+              <td id="rep_ft_sales" style="text-align:right;padding:12px 8px;color:#5a0f2a;font-size:15px">${inr(totalSales)}</td>
+              <td id="rep_ft_points" style="text-align:center;padding:12px 8px;color:#0a7a4b">+${totalPoints} pts</td>
+              <td colspan="2"></td>
+            </tr>
+          </tbody>
+        </table>
+        <p id="rep_no_match" style="display:none;padding:24px 0;text-align:center;color:#888">No bills match your search criteria.</p>
+      </div>
+    ` : `<p style="padding:32px 0;text-align:center;color:#888">No bills found in the selected date range.</p>`}
+  </div>`;
+}
+
+function exportPosReportCSV() {
+  const filtered = getFilteredReportBills();
+  if (!filtered.length) return toast('No bills to export in selected date range');
+
+  const headers = [
+    'Invoice Number',
+    'Date & Time',
+    'Customer Name',
+    'Phone Number',
+    'Customer Code',
+    'Items Count',
+    'Subtotal (INR)',
+    'Discount (INR)',
+    'Final Amount (INR)',
+    'Payment Method',
+    'Loyalty Points Earned'
+  ];
+
+  let csvContent = '\uFEFF' + headers.join(',') + '\n';
+
+  let totalSub = 0, totalDisc = 0, totalFinal = 0, totalPts = 0, totalItems = 0;
+
+  for (const b of filtered) {
+    const itemCount = (b.items || []).reduce((s, it) => s + (Number(it.qty) || 1), 0);
+    totalItems += itemCount;
+    totalSub += Number(b.subtotal) || Number(b.finalAmount) || 0;
+    totalDisc += Number(b.discount) || 0;
+    totalFinal += Number(b.finalAmount) || 0;
+    totalPts += Number(b.points) || 0;
+
+    const row = [
+      `"${b.id}"`,
+      `"${(b.date || '').replace(/"/g, '""')}"`,
+      `"${(b.customer ? b.customer.name : 'Walk-in').replace(/"/g, '""')}"`,
+      `"${(b.customer ? b.customer.phone : '-').replace(/"/g, '""')}"`,
+      `"${(b.customer ? b.customer.code : '-').replace(/"/g, '""')}"`,
+      itemCount,
+      b.subtotal || b.finalAmount,
+      b.discount || 0,
+      b.finalAmount,
+      `"${b.payMode || 'Cash'}"`,
+      b.points || 0
+    ];
+    csvContent += row.join(',') + '\n';
+  }
+
+  csvContent += `\n"TOTALS (${filtered.length} Bills)","","","","",${totalItems},${totalSub},${totalDisc},${totalFinal},"",${totalPts}\n`;
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const dStr = posRepFrom && posRepTo ? `${posRepFrom}_to_${posRepTo}` : (posRepFrom ? `from_${posRepFrom}` : 'all_time');
+  a.href = url;
+  a.download = `Sreekrishna_Sales_Report_${dStr}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(`✓ Downloaded ${filtered.length} bills as Excel/CSV!`);
+}
+
+function posPrintClean(elementId, title) {
+  const src = document.getElementById(elementId);
+  if (!src) return window.print();
+
+  let f = document.getElementById('pos_clean_print_frame');
+  if (f) f.remove();
+
+  f = document.createElement('iframe');
+  f.id = 'pos_clean_print_frame';
+  f.style.position = 'fixed';
+  f.style.right = '0';
+  f.style.bottom = '0';
+  f.style.width = '0';
+  f.style.height = '0';
+  f.style.border = '0';
+  f.style.visibility = 'hidden';
+  document.body.appendChild(f);
+
+  const doc = f.contentWindow.document;
+  doc.open();
+  doc.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${title || 'Print Document'}</title>
+  <style>
+    @page { size: auto; margin: 8mm 10mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 12px 18px;
+      color: #2c1b18;
+      background: #fff;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    h2 { font-family: Georgia, serif; letter-spacing: 1px; color: #5a0f2a; margin: 0; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 12.5px; }
+    th { border-top: 2px solid #5a0f2a; border-bottom: 2px solid #5a0f2a; background: #fdf8f4; padding: 7px 6px; font-weight: 700; color: #5a0f2a; }
+    td { padding: 7px 6px; border-bottom: 1px solid #ebd8ca; }
+    .noprint { display: none !important; }
+    b { color: #5a0f2a; }
+  </style>
+</head>
+<body>
+  ${src.innerHTML}
+</body>
+</html>`);
+  doc.close();
+
+  setTimeout(() => {
+    try {
+      f.contentWindow.focus();
+      f.contentWindow.print();
+    } catch (e) {
+      console.warn('Iframe print error, falling back:', e);
+      window.print();
+    }
+  }, 250);
+}
+
+function downloadPosReportPDFDirect() {
+  const filtered = getFilteredReportBills();
+  if (!filtered.length) return toast('No bills to export in selected date range');
+
+  if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
+    return posPrintClean('report_print_area', 'Sales & Billing Summary Report');
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  // Store Header
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(90, 15, 42);
+  doc.text('SREEKRISHNA TEXTILES', 105, 14, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(100, 100, 100);
+  doc.text('Kovai Road, Pollachi - 642002  |  Phone: +91 9976392317', 105, 19, { align: 'center' });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(90, 15, 42);
+  doc.text('SALES & BILLING SUMMARY REPORT', 105, 25, { align: 'center' });
+
+  const periodText = (posRepFrom && posRepTo) ? `${posRepFrom} to ${posRepTo}` : (posRepFrom ? `From ${posRepFrom}` : (posRepTo ? `Up to ${posRepTo}` : 'All Time'));
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(80, 80, 80);
+  doc.text(`Period: ${periodText}    |    Generated: ${new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}`, 105, 30, { align: 'center' });
+
+  doc.setDrawColor(90, 15, 42);
+  doc.setLineWidth(0.4);
+  doc.line(14, 33, 196, 33);
+
+  // Summary Metrics Box
+  const totalSales = filtered.reduce((s, b) => s + (Number(b.finalAmount) || 0), 0);
+  const totalPoints = filtered.reduce((s, b) => s + (Number(b.points) || 0), 0);
+  const totalSub = filtered.reduce((s, b) => s + (Number(b.subtotal) || Number(b.finalAmount) || 0), 0);
+  const totalDisc = filtered.reduce((s, b) => s + (Number(b.discount) || 0), 0);
+
+  doc.setFillColor(253, 248, 244);
+  doc.roundedRect(14, 36, 182, 13, 2, 2, 'F');
+  doc.setFontSize(8);
+  doc.setTextColor(100, 100, 100);
+  doc.text('TOTAL SALES:', 18, 41);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(90, 15, 42);
+  doc.text(`Rs. ${totalSales.toLocaleString('en-IN')}`, 42, 41);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 100, 100);
+  doc.text('BILLS COUNT:', 78, 41);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(10, 122, 75);
+  doc.text(`${filtered.length}`, 103, 41);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 100, 100);
+  doc.text('LOYALTY PTS:', 125, 41);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(201, 162, 74);
+  doc.text(`+${totalPoints} pts`, 150, 41);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 100, 100);
+  doc.text('AVG BILL:', 18, 46);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(90, 15, 42);
+  doc.text(`Rs. ${Math.round(totalSales / (filtered.length || 1)).toLocaleString('en-IN')}`, 37, 46);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 100, 100);
+  doc.text('DISCOUNT:', 78, 46);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(10, 122, 75);
+  doc.text(`-Rs. ${totalDisc.toLocaleString('en-IN')}`, 100, 46);
+
+  // Table Data
+  const head = [['Inv #', 'Date', 'Customer', 'Phone', 'Items', 'Subtotal', 'Discount', 'Final (Rs)', 'Points', 'Pay']];
+  const body = filtered.map(b => [
+    b.id,
+    b.date ? b.date.slice(0, 11) : '',
+    b.customer ? b.customer.name : 'Walk-in',
+    b.customer ? b.customer.phone : '-',
+    (b.items || []).reduce((s, it) => s + (Number(it.qty) || 1), 0),
+    `Rs. ${(Number(b.subtotal) || Number(b.finalAmount) || 0).toLocaleString('en-IN')}`,
+    b.discount ? `-Rs. ${Number(b.discount).toLocaleString('en-IN')}` : '0',
+    `Rs. ${Number(b.finalAmount).toLocaleString('en-IN')}`,
+    `+${b.points || 0}`,
+    b.payMode || 'Cash'
+  ]);
+
+  body.push([
+    'TOTALS', '', '', '',
+    filtered.reduce((s, b) => s + (b.items || []).reduce((is, it) => is + (Number(it.qty) || 1), 0), 0),
+    `Rs. ${totalSub.toLocaleString('en-IN')}`,
+    `-Rs. ${totalDisc.toLocaleString('en-IN')}`,
+    `Rs. ${totalSales.toLocaleString('en-IN')}`,
+    `+${totalPoints}`,
+    ''
+  ]);
+
+  const autoTableFn = (doc.autoTable || (window.jspdf && window.jspdf.autoTable));
+  if (autoTableFn) {
+    autoTableFn.call(doc, {
+      startY: 52,
+      head: head,
+      body: body,
+      theme: 'grid',
+      headStyles: { fillColor: [90, 15, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5 },
+      bodyStyles: { fontSize: 7, textColor: [40, 40, 40] },
+      alternateRowStyles: { fillColor: [253, 248, 245] },
+      margin: { left: 14, right: 14 },
+      columnStyles: {
+        0: { cellWidth: 26, fontStyle: 'bold' },
+        4: { halign: 'center' },
+        5: { halign: 'right' },
+        6: { halign: 'right' },
+        7: { halign: 'right', fontStyle: 'bold' },
+        8: { halign: 'center' },
+        9: { halign: 'center' }
+      },
+      didParseCell: function(data) {
+        if (data.row.index === body.length - 1) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fillColor = [250, 240, 230];
+          data.cell.styles.textColor = [90, 15, 42];
+        }
+      }
+    });
+  }
+
+  const dStr = posRepFrom && posRepTo ? `${posRepFrom}_to_${posRepTo}` : (posRepFrom ? `from_${posRepFrom}` : 'all_time');
+  doc.save(`Sreekrishna_Sales_Report_${dStr}.pdf`);
+  toast('✓ Sales Report PDF downloaded successfully!');
+}
+
+function exportPosReportPDF() {
+  const filtered = getFilteredReportBills();
+  if (!filtered.length) return toast('No bills to export in selected date range');
+  posPrintingReport = true;
+  route();
+}
+
+function renderPosReportPrintModal() {
+  const filtered = getFilteredReportBills();
+  const totalSales = filtered.reduce((s, b) => s + (Number(b.finalAmount) || 0), 0);
+  const totalPoints = filtered.reduce((s, b) => s + (Number(b.points) || 0), 0);
+  const periodText = (posRepFrom && posRepTo) ? `${posRepFrom} to ${posRepTo}` : (posRepFrom ? `From ${posRepFrom}` : (posRepTo ? `Up to ${posRepTo}` : 'All Time'));
+
+  return `<div class="pos-modal-backdrop" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto" onclick="if(event.target===this){posPrintingReport=false;route()}">
+    <div class="pos-modal-card" style="background:#fff;width:100%;max-width:820px;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,0.25);overflow:hidden;animation:popIn .2s ease">
+      <div class="noprint" style="background:#5a0f2a;color:#fcecd2;padding:14px 20px;display:flex;justify-content:space-between;align-items:center">
+        <b style="font-size:15px">📊 Sales &amp; Billing Report Preview</b>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn" onclick="downloadPosReportPDFDirect()" style="padding:6px 14px;font-size:12.5px;background:#0a7a4b;color:#fff;font-weight:700">📥 Download PDF</button>
+          <button type="button" class="btn" onclick="posPrintClean('report_print_area', 'Sales &amp; Billing Report')" style="padding:6px 16px;font-size:12.5px;background:#f6d289;color:#5a0f2a;font-weight:700">🖨 Print Report</button>
+          <button type="button" onclick="posPrintingReport=false;route()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer">&times;</button>
+        </div>
+      </div>
+
+      <div id="report_print_area" style="padding:28px 24px;color:#2c1b18;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">
+        <div style="text-align:center;border-bottom:2px solid #5a0f2a;padding-bottom:12px;margin-bottom:14px">
+          <h2 style="margin:0;color:#5a0f2a;font-size:24px;font-family:Georgia,serif">SREEKRISHNA TEXTILES</h2>
+          <p style="margin:2px 0;font-size:12px;color:#666">Kovai Road, Pollachi - 642002 · Phone: +91 9976392317</p>
+          <div style="margin-top:6px;font-weight:700;color:#5a0f2a;font-size:15px;letter-spacing:1px">SALES &amp; BILLING SUMMARY REPORT</div>
+          <div style="font-size:12px;color:#555;margin-top:2px">Period: <b>${periodText}</b> · Generated on: ${new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;background:#fdf8f4;border:1px solid #ebd8ca;border-radius:8px;padding:12px">
+          <div><span style="font-size:11px;color:#666;text-transform:uppercase">Total Sales</span><br><b style="color:#5a0f2a;font-size:18px">${inr(totalSales)}</b></div>
+          <div><span style="font-size:11px;color:#666;text-transform:uppercase">Bills Count</span><br><b style="color:#0a7a4b;font-size:18px">${filtered.length}</b></div>
+          <div><span style="font-size:11px;color:#666;text-transform:uppercase">Total Loyalty Awarded</span><br><b style="color:#c9a24a;font-size:18px">+${totalPoints} pts</b></div>
+        </div>
+
+        <table style="width:100%;font-size:12px;border-collapse:collapse;margin-bottom:16px">
+          <thead>
+            <tr style="border-top:1px solid #333;border-bottom:1px solid #333;background:#f8f4f0">
+              <th style="text-align:left;padding:6px 4px">Invoice #</th>
+              <th style="text-align:left;padding:6px 4px">Date</th>
+              <th style="text-align:left;padding:6px 4px">Customer</th>
+              <th style="text-align:left;padding:6px 4px">Phone</th>
+              <th style="text-align:right;padding:6px 4px">Subtotal</th>
+              <th style="text-align:right;padding:6px 4px">Discount</th>
+              <th style="text-align:right;padding:6px 4px">Final (₹)</th>
+              <th style="text-align:center;padding:6px 4px">Points</th>
+              <th style="text-align:center;padding:6px 4px">Pay</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filtered.map(b => `
+              <tr style="border-bottom:1px solid #eee">
+                <td style="padding:6px 4px"><b>${b.id}</b></td>
+                <td style="padding:6px 4px;color:#555">${b.date}</td>
+                <td style="padding:6px 4px"><b>${esc(b.customer ? b.customer.name : 'Walk-in')}</b></td>
+                <td style="padding:6px 4px">${esc(b.customer ? b.customer.phone : '-')}</td>
+                <td style="text-align:right;padding:6px 4px">${inr(b.subtotal || b.finalAmount)}</td>
+                <td style="text-align:right;padding:6px 4px;color:#0a7a4b">${b.discount ? '-' + inr(b.discount) : '₹0'}</td>
+                <td style="text-align:right;padding:6px 4px"><b>${inr(b.finalAmount)}</b></td>
+                <td style="text-align:center;padding:6px 4px">+${b.points || 0}</td>
+                <td style="text-align:center;padding:6px 4px">${b.payMode || 'Cash'}</td>
+              </tr>
+            `).join('')}
+            <tr style="border-top:2px solid #5a0f2a;font-weight:700">
+              <td colspan="4" style="padding:8px 4px;color:#5a0f2a">TOTALS</td>
+              <td style="text-align:right;padding:8px 4px">${inr(filtered.reduce((s, b) => s + (Number(b.subtotal) || Number(b.finalAmount) || 0), 0))}</td>
+              <td style="text-align:right;padding:8px 4px;color:#0a7a4b">-${inr(filtered.reduce((s, b) => s + (Number(b.discount) || 0), 0))}</td>
+              <td style="text-align:right;padding:8px 4px;color:#5a0f2a">${inr(totalSales)}</td>
+              <td style="text-align:center;padding:8px 4px;color:#0a7a4b">+${totalPoints} pts</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style="text-align:center;font-size:11px;color:#888;border-top:1px solid #eee;padding-top:10px">
+          Sreekrishna Textiles Store Management System · Generated report
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function posOpenEditBill(invId) {
+  const bills = getStoreBills();
+  const b = bills.find(x => x.id === invId);
+  if (!b) return toast('Invoice not found');
+  posEditingBill = JSON.parse(JSON.stringify(b));
+  route();
+}
+
+function editBillRecalcPoints(val) {
+  const amt = Math.max(0, parseFloat(val) || 0);
+  const pts = Math.floor(amt / 100);
+  const pEl = $('#edit_points');
+  if (pEl) pEl.value = pts;
+}
+
+function renderPosEditModal() {
+  const b = posEditingBill;
+  if (!b) return '';
+
+  return `<div class="pos-modal-backdrop" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto" onclick="if(event.target===this){posEditingBill=null;route()}">
+    <div class="pos-modal-card" style="background:#fff;width:100%;max-width:580px;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,0.25);overflow:hidden;animation:popIn .2s ease">
+      <div class="noprint" style="background:#5a0f2a;color:#fcecd2;padding:14px 20px;display:flex;justify-content:space-between;align-items:center">
+        <b style="font-size:15px">✏ Edit Invoice #${b.id}</b>
+        <button type="button" onclick="posEditingBill=null;route()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer">&times;</button>
+      </div>
+
+      <div style="padding:22px 24px">
+        <p style="margin:0 0 16px;font-size:12.5px;color:#666">Modify customer details, final bill amount, loyalty points or payment mode. Edits save to local storage and sync directly to MySQL database.</p>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+          <div>
+            <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;color:#444">Customer Phone (10 Digits)</label>
+            <input id="edit_cust_phone" type="tel" value="${esc(b.customer ? b.customer.phone : '')}" style="margin:0">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;color:#444">Customer Name</label>
+            <input id="edit_cust_name" type="text" value="${esc(b.customer ? b.customer.name : '')}" style="margin:0">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+          <div>
+            <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;color:#444">Final Bill Amount (₹)</label>
+            <input id="edit_final_amount" type="number" min="0" value="${b.finalAmount}" oninput="editBillRecalcPoints(this.value)" style="margin:0">
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+              <label style="font-size:12px;font-weight:700;color:#444;margin:0">Loyalty Points</label>
+              <button type="button" onclick="editBillRecalcPoints($('#edit_final_amount').value)" style="font-size:10px;padding:2px 6px;background:#eafaf1;color:#0a7a4b;border:1px solid #b7ebd0;border-radius:4px;cursor:pointer">⚡ Auto Calc (₹100=1pt)</button>
+            </div>
+            <input id="edit_points" type="number" min="0" value="${b.points}" style="margin:0">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
+          <div>
+            <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;color:#444">Payment Method</label>
+            <select id="edit_pay_mode" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc;background:#fff;font-size:13px">
+              <option value="Cash" ${b.payMode === 'Cash' ? 'selected' : ''}>Cash</option>
+              <option value="UPI" ${b.payMode === 'UPI' ? 'selected' : ''}>UPI / GPay / PhonePe</option>
+              <option value="Card" ${b.payMode === 'Card' ? 'selected' : ''}>Credit / Debit Card</option>
+              <option value="Net Banking" ${b.payMode === 'Net Banking' ? 'selected' : ''}>Net Banking</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;color:#444">Invoice Date &amp; Time</label>
+            <input id="edit_date" type="text" value="${esc(b.date)}" style="margin:0">
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;justify-content:flex-end;border-top:1px solid #ebd8ca;padding-top:16px">
+          <button type="button" class="btn o" onclick="posEditingBill=null;route()">Cancel</button>
+          <button type="button" class="btn" onclick="posSaveEditedBill()" style="background:#5a0f2a;color:#fff;padding:8px 22px">💾 Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function posSaveEditedBill() {
+  if (!posEditingBill) return;
+  const bId = posEditingBill.id;
+  const newPhone = ($('#edit_cust_phone').value || '').trim().replace(/\D/g, '').slice(-10);
+  const newName = ($('#edit_cust_name').value || '').trim();
+  const newAmount = Math.max(0, +$('#edit_final_amount').value || 0);
+  const newPoints = Math.max(0, +$('#edit_points').value || 0);
+  const newPayMode = $('#edit_pay_mode').value;
+  const newDate = ($('#edit_date').value || '').trim();
+
+  if (!newName) return toast('Customer name cannot be empty');
+  if (newPhone.length !== 10) return toast('Please enter a valid 10-digit phone number');
+
+  const bills = getStoreBills();
+  const b = bills.find(x => x.id === bId);
+  if (!b) return toast('Bill not found');
+
+  const oldPoints = b.points || 0;
+  const pointsDiff = newPoints - oldPoints;
+
+  b.customer = b.customer || {};
+  b.customer.phone = newPhone;
+  b.customer.name = newName;
+  b.finalAmount = newAmount;
+  b.points = newPoints;
+  b.payMode = newPayMode;
+  if (newDate) b.date = newDate;
+
+  // Update customer directory
+  const custs = getStoreCusts();
+  let cust = custs.find(c => c.phone === newPhone || (b.customer.code && c.code === b.customer.code));
+  if (cust) {
+    cust.name = newName;
+    cust.phone = newPhone;
+    cust.points = Math.max(0, (cust.points || 0) + pointsDiff);
+    b.custPointsAfter = cust.points;
+  }
+  ST('store_custs', custs);
+  ST('store_bills', bills);
+
+  // Sync edit to MySQL backend
+  const base = window.API_BASE || (location.protocol === 'http:' || location.protocol === 'https:' ? '' : 'http://localhost:3000');
+  try {
+    fetch(base + '/api/purchases/' + encodeURIComponent(bId) + '/', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(typeof TOK !== 'undefined' && TOK ? { 'Authorization': 'Bearer ' + TOK } : {})
+      },
+      body: JSON.stringify({
+        customer_name: newName,
+        customer_phone: newPhone,
+        final_amount: newAmount,
+        points_earned: newPoints,
+        payment_method: newPayMode,
+        invoice_number: bId
+      })
+    }).then(() => console.log('Bill edit synced to MySQL ✓')).catch(e => console.warn('Patch note:', e));
+  } catch (_) {}
+
+  if (posPrintingBill && posPrintingBill.id === bId) {
+    posPrintingBill = b;
+  }
+
+  posEditingBill = null;
+  toast(`✓ Bill #${bId} updated successfully!`);
+  route();
+}
+
+function posFillProductPrice(prodId) {
+  if (!prodId) return;
+  if (prodId === 'CUSTOM') {
+    $('#pos_item_name').value = '';
+    $('#pos_item_price').value = '';
+    $('#pos_item_name').focus();
+    return;
+  }
+  const p = find(prodId);
+  if (p) {
+    $('#pos_item_name').value = p.name;
+    $('#pos_item_price').value = p.price;
+  }
+}
+
+function posCheckExistingCust(val) {
+  const phone = (val || '').replace(/\D/g, '').slice(-10);
+  const hint = $('#pos_cust_hint');
+  if (phone.length === 10) {
+    const custs = getStoreCusts();
+    const c = custs.find(x => x.phone === phone);
+    if (c) {
+      if (!$('#pos_cname').value) $('#pos_cname').value = c.name;
+      if (hint) hint.innerHTML = '★ Matched Customer: ' + esc(c.name) + ' (' + c.code + ') · ' + (c.points || 0) + ' Loyalty Pts';
+    } else {
+      if (hint) hint.innerHTML = '✓ New customer registration';
+    }
+  } else {
+    if (hint) hint.innerHTML = '';
+  }
+}
+
+function posAddItemToCart() {
+  const name = ($('#pos_item_name').value || '').trim();
+  const price = Math.max(0, +$('#pos_item_price').value || 0);
+  const qty = Math.max(1, +$('#pos_item_qty').value || 1);
+
+  if (!name) return toast('Please enter or select an item name');
+  if (!price) return toast('Please enter a valid price for the item');
+
+  posCart.push({ name, price, qty });
+  $('#pos_item_name').value = '';
+  $('#pos_item_price').value = '';
+  $('#pos_item_qty').value = 1;
+  $('#pos_prod_sel').value = '';
+  toast('Item added to bill ✓');
+  route();
+}
+
+function posRemoveItem(idx) {
+  posCart.splice(idx, 1);
+  route();
+}
+
+function posCreateBill(printNow) {
+  const name = ($('#pos_cname').value || '').trim();
+  const rawPhone = ($('#pos_cphone').value || '').trim();
+  const phone = rawPhone.replace(/\D/g, '').slice(-10);
+
+  if (!name) return toast('Please enter customer name');
+  if (phone.length !== 10) return toast('Please enter a valid 10-digit phone number');
+  if (!posCart.length) return toast('Please add at least one item to the bill');
+
+  const subtotal = posCart.reduce((sum, it) => sum + it.price * it.qty, 0);
+  const discount = Math.max(0, +($('#pos_disc') ? $('#pos_disc').value : 0) || 0);
+  const discountPct = Math.max(0, +($('#pos_disc_pct') ? $('#pos_disc_pct').value : 0) || 0);
+  const finalAmount = Math.max(0, subtotal - discount);
+  const points = Math.floor(finalAmount / 100);
+  const payMode = $('#pos_pay') ? $('#pos_pay').value : 'Cash';
+
+  const bills = getStoreBills();
+  const invNo = 'INV-2026-' + String(bills.length + 1).padStart(6, '0');
+
+  // Customer handling
+  const custs = getStoreCusts();
+  let cust = custs.find(c => c.phone === phone);
+  if (!cust) {
+    cust = {
+      code: 'CUST-' + String(custs.length + 1).padStart(4, '0'),
+      name,
+      phone,
+      points: 0,
+      totalSpent: 0,
+      billsCount: 0
+    };
+    custs.push(cust);
+  } else {
+    cust.name = name;
+  }
+  cust.points = (cust.points || 0) + points;
+  cust.totalSpent = (cust.totalSpent || 0) + finalAmount;
+  cust.billsCount = (cust.billsCount || 0) + 1;
+  ST('store_custs', custs);
+
+  const bill = {
+    id: invNo,
+    date: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+    iso: new Date().toISOString(),
+    customer: { name, phone, code: cust.code },
+    items: [...posCart],
+    subtotal,
+    discount,
+    discountPct,
+    finalAmount,
+    points,
+    payMode,
+    custPointsAfter: cust.points
+  };
+  bills.unshift(bill);
+  ST('store_bills', bills);
+
+  // Sync directly to MySQL backend so it appears in phpMyAdmin immediately
+  const base = window.API_BASE || (location.protocol === 'http:' || location.protocol === 'https:' ? '' : 'http://localhost:3000');
+  try {
+    fetch(base + '/api/pos/sync-bills/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(typeof TOK !== 'undefined' && TOK ? { 'Authorization': 'Bearer ' + TOK } : {})
+      },
+      body: JSON.stringify({ bills: [bill] })
+    }).then(async r => {
+      if (r.ok) {
+        console.log('Bill synced to MySQL successfully ✓');
+      }
+    }).catch(e => console.warn('MySQL bill sync note:', e));
+  } catch (_) {}
+
+  posCart = [];
+  toast(`✓ Bill #${invNo} generated! +${points} loyalty points awarded.`);
+
+  if (printNow) {
+    posPrintingBill = bill;
+    route();
+  } else {
+    route();
+  }
+}
+
+function downloadPosInvoicePDF(invId) {
+  const bills = getStoreBills();
+  const b = bills.find(x => x.id === invId) || posPrintingBill;
+  if (!b) return toast('Invoice not found');
+
+  if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
+    return posPrintClean('print_area', 'Tax Invoice ' + b.id);
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  // Store Brand Header
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(20);
+  doc.setTextColor(90, 15, 42);
+  doc.text('SREEKRISHNA TEXTILES', 105, 18, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(110, 110, 110);
+  doc.text('Tradition Meets Elegance · Heritage Silks & Sarees', 105, 23, { align: 'center' });
+  doc.text('Kovai Road, Pollachi - 642002  |  Phone: +91 9976392317', 105, 27.5, { align: 'center' });
+
+  doc.setFillColor(253, 248, 244);
+  doc.roundedRect(70, 31, 70, 7, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(90, 15, 42);
+  doc.text('RETAIL TAX INVOICE', 105, 36, { align: 'center' });
+
+  // Invoice & Customer Info Box
+  doc.setDrawColor(235, 216, 202);
+  doc.setLineWidth(0.3);
+  doc.line(14, 42, 196, 42);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(120, 120, 120);
+  doc.text('BILLED TO:', 16, 48);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(40, 20, 25);
+  doc.text(b.customer ? b.customer.name : 'Walk-in', 16, 54);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(80, 80, 80);
+  doc.text(`Phone: ${b.customer ? b.customer.phone : '-'}`, 16, 59);
+  doc.text(`Customer Code: ${b.customer && b.customer.code ? b.customer.code : '-'}`, 16, 64);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(120, 120, 120);
+  doc.text('INVOICE DETAILS:', 130, 48);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(90, 15, 42);
+  doc.text(b.id, 130, 54);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(80, 80, 80);
+  doc.text(`Date: ${b.date}`, 130, 59);
+  doc.text(`Payment: ${b.payMode || 'Cash'}`, 130, 64);
+
+  // Items Table
+  const items = (b.items && b.items.length) ? b.items : [{ name: 'Store Garment', price: b.finalAmount, qty: 1 }];
+  const head = [['#', 'Item Description', 'Qty', 'Unit Price (Rs)', 'Total (Rs)']];
+  const body = items.map((it, idx) => [
+    idx + 1,
+    it.name,
+    it.qty,
+    `Rs. ${(Number(it.price) || 0).toLocaleString('en-IN')}`,
+    `Rs. ${((Number(it.price) || 0) * (Number(it.qty) || 1)).toLocaleString('en-IN')}`
+  ]);
+
+  const autoTableFn = (doc.autoTable || (window.jspdf && window.jspdf.autoTable));
+  if (autoTableFn) {
+    autoTableFn.call(doc, {
+      startY: 70,
+      head: head,
+      body: body,
+      theme: 'grid',
+      headStyles: { fillColor: [90, 15, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      bodyStyles: { fontSize: 8.5, textColor: [40, 40, 40] },
+      alternateRowStyles: { fillColor: [253, 248, 245] },
+      margin: { left: 14, right: 14 },
+      columnStyles: {
+        0: { cellWidth: 12, halign: 'center' },
+        2: { cellWidth: 16, halign: 'center' },
+        3: { cellWidth: 32, halign: 'right' },
+        4: { cellWidth: 34, halign: 'right', fontStyle: 'bold' }
+      }
+    });
+  }
+
+  let finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 6 : 140;
+
+  doc.setDrawColor(179, 18, 42);
+  doc.setLineDashPattern([2, 2], 0);
+  doc.line(14, finalY, 196, finalY);
+  doc.setLineDashPattern([], 0);
+
+  finalY += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(80, 80, 80);
+  doc.text('Subtotal:', 125, finalY);
+  doc.text(`Rs. ${(Number(b.subtotal) || Number(b.finalAmount) || 0).toLocaleString('en-IN')}`, 196, finalY, { align: 'right' });
+
+  if (b.discount) {
+    finalY += 5;
+    doc.setTextColor(10, 122, 75);
+    doc.text(`Discount${b.discountPct ? ' (' + b.discountPct + '%)' : ''}:`, 125, finalY);
+    doc.text(`-Rs. ${Number(b.discount).toLocaleString('en-IN')}`, 196, finalY, { align: 'right' });
+  }
+
+  finalY += 7;
+  doc.setDrawColor(235, 216, 202);
+  doc.line(125, finalY - 2, 196, finalY - 2);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(90, 15, 42);
+  doc.text('Grand Total:', 125, finalY + 3);
+  doc.text(`Rs. ${Number(b.finalAmount).toLocaleString('en-IN')}`, 196, finalY + 3, { align: 'right' });
+
+  // Loyalty rewards banner
+  finalY += 12;
+  doc.setFillColor(234, 250, 241);
+  doc.roundedRect(14, finalY, 182, 14, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(10, 122, 75);
+  doc.text(`CUSTOMER LOYALTY REWARDS: +${b.points || 0} Points Earned on this Bill`, 105, finalY + 6, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(50, 50, 50);
+  doc.text(`Total Loyalty Points Balance: ${b.custPointsAfter || b.points || 0} pts (Rs. 100 = 1 pt)`, 105, finalY + 11, { align: 'center' });
+
+  // Thank you note
+  finalY += 22;
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(9);
+  doc.setTextColor(100, 100, 100);
+  doc.text('Thank you for shopping with Sreekrishna Textiles!', 105, finalY, { align: 'center' });
+  doc.text('Goods once sold can be exchanged within 7 days with original invoice.', 105, finalY + 4.5, { align: 'center' });
+
+  doc.save(`Invoice_${b.id}.pdf`);
+  toast(`✓ Downloaded Invoice ${b.id} as PDF!`);
+}
+
+function posOpenInvoice(invId) {
+  const bills = getStoreBills();
+  const b = bills.find(x => x.id === invId);
+  if (!b) return toast('Invoice not found');
+  posPrintingBill = b;
+  route();
+}
+
+function renderPosPrintModal() {
+  const b = posPrintingBill;
+  if (!b) return '';
+
+  return `<div class="pos-modal-backdrop" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto" onclick="if(event.target===this){posPrintingBill=null;route()}">
+    <div class="pos-modal-card" style="background:#fff;width:100%;max-width:680px;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,0.25);overflow:hidden;animation:popIn .2s ease">
+      <div class="noprint" style="background:#5a0f2a;color:#fcecd2;padding:14px 20px;display:flex;justify-content:space-between;align-items:center">
+        <b style="font-size:15px">Tax Invoice / Bill Preview</b>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button type="button" class="btn o" onclick="posOpenEditBill('${b.id}')" style="padding:4px 10px;font-size:12px;background:#fff;color:#5a0f2a">✏ Edit Bill</button>
+          <button type="button" class="btn" onclick="downloadPosInvoicePDF('${b.id}')" style="padding:6px 14px;font-size:12.5px;background:#0a7a4b;color:#fff;font-weight:700">📥 Download Invoice PDF</button>
+          <button type="button" class="btn" onclick="posPrintClean('print_area', 'Tax Invoice ${b.id}')" style="padding:6px 16px;font-size:12.5px;background:#f6d289;color:#5a0f2a;font-weight:700">🖨 Print Invoice</button>
+          <button type="button" onclick="posPrintingBill=null;route()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer">&times;</button>
+        </div>
+      </div>
+
+      <div id="print_area" style="padding:28px 32px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:#2c1b18;line-height:1.5">
+        <div style="text-align:center;border-bottom:2px dashed #b3122a;padding-bottom:14px;margin-bottom:16px">
+          <h2 style="margin:0;color:#5a0f2a;font-size:24px;font-family:Georgia,serif;letter-spacing:1px">SREEKRISHNA TEXTILES</h2>
+          <p style="margin:3px 0;font-size:12px;color:#777">Tradition Meets Elegance · Heritage Silks &amp; Sarees</p>
+          <p style="margin:2px 0;font-size:11.5px;color:#555">Kovai Road, Pollachi - 642002 · Phone: +91 9976392317</p>
+          <div style="margin-top:8px;display:inline-block;padding:3px 14px;background:#fdf8f4;border:1px solid #ebd8ca;border-radius:4px;font-size:11.5px;font-weight:700;color:#5a0f2a;letter-spacing:1px">
+            RETAIL TAX INVOICE
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px;margin-bottom:18px;line-height:1.6">
+          <div>
+            <span style="font-size:11px;color:#888;text-transform:uppercase;font-weight:700">Billed To:</span><br>
+            <span style="font-size:15px;font-weight:700;color:#2c1b18">${esc(b.customer ? b.customer.name : 'Walk-in')}</span><br>
+            Phone: <b>${esc(b.customer ? b.customer.phone : '-')}</b><br>
+            Customer Code: <code style="font-weight:700;color:#5a0f2a">${esc(b.customer ? b.customer.code : '-')}</code>
+          </div>
+          <div style="text-align:right">
+            <span style="font-size:11px;color:#888;text-transform:uppercase;font-weight:700">Invoice Details:</span><br>
+            <b style="font-size:15px;color:#5a0f2a">${b.id}</b><br>
+            Date: <b>${b.date}</b><br>
+            Payment Mode: <span style="background:#f5efe8;padding:2px 8px;border-radius:4px;font-weight:600">${b.payMode || 'Cash'}</span>
+          </div>
+        </div>
+
+        <table style="width:100%;font-size:13px;border-collapse:collapse;margin-bottom:16px">
+          <thead>
+            <tr style="border-top:2px solid #5a0f2a;border-bottom:2px solid #5a0f2a;background:#fcf8f5">
+              <th style="text-align:left;padding:8px 6px">Item Description</th>
+              <th style="text-align:center;padding:8px 6px">Qty</th>
+              <th style="text-align:right;padding:8px 6px">Unit Price</th>
+              <th style="text-align:right;padding:8px 6px">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(b.items || []).map(it => `
+              <tr style="border-bottom:1px solid #f0e6dd">
+                <td style="padding:9px 6px"><b>${esc(it.name)}</b></td>
+                <td style="text-align:center;padding:9px 6px">${it.qty}</td>
+                <td style="text-align:right;padding:9px 6px">${inr(it.price)}</td>
+                <td style="text-align:right;padding:9px 6px"><b>${inr(it.price * it.qty)}</b></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div style="border-top:2px dashed #b3122a;padding-top:12px;margin-bottom:16px;font-size:13.5px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+            <span>Subtotal:</span><span>${inr(b.subtotal || b.finalAmount)}</span>
+          </div>
+          ${b.discount ? `
+            <div style="display:flex;justify-content:space-between;margin-bottom:5px;color:#0a7a4b">
+              <span>Discount${b.discountPct ? ' (' + b.discountPct + '%)' : ''}:</span>
+              <span>-${inr(b.discount)}</span>
+            </div>
+          ` : ''}
+          <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;color:#5a0f2a;border-top:2px solid #ebd8ca;padding-top:8px">
+            <span>Grand Total:</span><span>${inr(b.finalAmount)}</span>
+          </div>
+        </div>
+
+        <div style="background:#fdf8f4;border:1px dashed #c9a24a;border-radius:10px;padding:12px 14px;text-align:center;margin-bottom:16px">
+          <span style="font-size:11px;color:#8a5e1e;font-weight:700;letter-spacing:1px;text-transform:uppercase;display:block">Customer Loyalty Rewards</span>
+          <b style="font-size:16px;color:#0a7a4b">+${b.points || 0} Points Earned on this Bill</b>
+          <small style="display:block;color:#666;font-size:11.5px;margin-top:3px">Total Customer Loyalty Points Balance: <b>${b.custPointsAfter || b.points || 0} pts</b> (₹100 = 1 pt)</small>
+        </div>
+
+        <div style="text-align:center;font-size:11.5px;color:#777;border-top:1px solid #ebd8ca;padding-top:12px">
+          <p style="margin:0 0 3px;font-weight:700;color:#5a0f2a">Thank you for shopping with Sreekrishna Textiles!</p>
+          <p style="margin:0">Goods once sold cannot be returned. Exchange within 7 days with this bill.</p>
+        </div>
+      </div>
+
+      <div class="noprint" style="background:#fcf8f5;border-top:1px solid #ebd8ca;padding:12px 20px;display:flex;justify-content:space-between;align-items:center">
+        <button type="button" class="btn o" onclick="posOpenEditBill('${b.id}')" style="font-size:12px">✏ Edit this Bill</button>
+        <div style="display:flex;gap:10px">
+          <button type="button" class="btn o" onclick="posPrintingBill=null;route()" style="font-size:12px">Close</button>
+          <button type="button" class="btn" onclick="window.print()" style="background:#5a0f2a;color:#fff;font-size:12px;padding:6px 18px">🖨 Print Invoice / Save PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
 function aDash(){const M=monthly(),S=M.reduce((a,d)=>a+d.sales,0),C=M.reduce((a,d)=>a+d.cogs,0),E=M.reduce((a,d)=>a+d.te,0),N=S-C-E,O=M.reduce((a,d)=>a+d.orders,0),cur=M[M.length-1]||{sales:0},prev=M[M.length-2]||cur;
 const k=(v,l,c)=>`<div><b${c?` style="color:${c}"`:''}>${v}</b>${l}</div>`,inv=P.reduce((a,p)=>a+p.cost*p.stock,0),low=P.filter(p=>p.stock>0&&p.stock<CFG.low).length,oos=P.filter(p=>!p.stock).length;
 const cats=API&&ADMC.cats?ADMC.cats.map(c=>[c.n,c.v]):[['Sarees',.64],['Salwar/Chudi Materials',.15],['Lehengas',.12],['Kurtis',.09]],top=API&&ADMC.top?ADMC.top:[...P].sort((a,b)=>R(+b.id.slice(2),97)-R(+a.id.slice(2),97)).slice(0,5).map(p=>({name:p.name,units:R(+p.id.slice(2),97)+20,stock:p.stock}));
@@ -1993,7 +3542,11 @@ else if(k=='product')out=product(h[1]);else if(k=='cart')out=cartPage();else if(
 else if(k=='wishlist')out=`<div class="pg"><h2>Wishlist</h2><div class="grid">${wish.map(id=>card(find(id))).join('')||'<p>Nothing saved yet.</p>'}</div></div>`;
 else if(k=='login'||k=='register')out=auth(k=='register');else if(k=='forgot'||k=='forgot-password')out=forgotPasswordView();else if(k=='account')out=account();else if(k=='orders')out=ordersPage();else if(k=='order')out=ordersPage(h[1]);else if(k=='admin')out=admin(h[1],h[2]);else if(k=='track')out=trackPage();
 else if(k=='p'&&PAGES[h[1]])out=`<div class="pg"><h2>${PAGES[h[1]][0]}</h2><div class="panel">${PAGES[h[1]][1]}</div></div>`;else out='<div class="pg"><h2>Page not found</h2></div>';
-app.innerHTML=out;{const t=app.querySelector('.pg h2');if(t){const h1=document.createElement('h1');h1.className=t.className;h1.setAttribute('style',t.getAttribute('style')||'');h1.innerHTML=t.innerHTML;t.replaceWith(h1)}const hh=app.querySelector('h1');document.title=(hh?hh.textContent+' | ':'')+'Sreekrishna Textiles';if(lastH&&!same)app.focus({preventScroll:true})}if(k=='c'||k=='s'){const key=k=='s'?'s':h[1]||'sarees';bindF(key,()=>{const y=scrollY;route();scrollTo(0,y)})}
+const _ae=document.activeElement;const _aid=(_ae&&(_ae.tagName==='INPUT'||_ae.tagName==='TEXTAREA'||_ae.tagName==='SELECT'))?_ae.id:null;const _ass=_ae&&typeof _ae.selectionStart==='number'?_ae.selectionStart:null;const _ase=_ae&&typeof _ae.selectionEnd==='number'?_ae.selectionEnd:null;
+app.innerHTML=out;
+document.body.classList.toggle('has-pos-modal', !!(posPrintingBill || posPrintingReport));
+if(_aid){const _res=document.getElementById(_aid);if(_res){_res.focus();if(_ass!==null&&_ase!==null){try{_res.setSelectionRange(_ass,_ase)}catch(_){}}}}
+{const t=app.querySelector('.pg h2');if(t){const h1=document.createElement('h1');h1.className=t.className;h1.setAttribute('style',t.getAttribute('style')||'');h1.innerHTML=t.innerHTML;t.replaceWith(h1)}const hh=app.querySelector('h1');document.title=(hh?hh.textContent+' | ':'')+'Sreekrishna Textiles';if(lastH&&!same&&!_aid)app.focus({preventScroll:true})}if(k=='c'||k=='s'){const key=k=='s'?'s':h[1]||'sarees';bindF(key,()=>{const y=scrollY;route();scrollTo(0,y)})}
 if(!k){petals($('#pt'));$('#hero').classList.add('on');$('#hv').style.display='none';if(!ready){ready=true}else{$('#hb').style.transform='none'}auto=setInterval(tick,7000)}
 $$('#nv a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')==(k?'#/'+h[0]+'/'+(h[1]||''):'#/')));counts();reveal();lastK=k;lastH=location.hash;scrollTo(0,same?y0:0)}
 addEventListener('hashchange',route);
