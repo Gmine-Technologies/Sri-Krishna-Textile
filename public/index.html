@@ -124,7 +124,7 @@ select,.panel input,.panel select,.bar input{color:var(--ink);background:#fff}.b
 .evs{list-style:none;padding:0;margin:0}.evs li{padding:10px 0;border-bottom:1px solid #eadccf}.evs li.new{background:#fff6e0;padding-left:8px;border-left:3px solid var(--gold)}
 .bdg{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;background:#eddcd0}.b-Processing{background:#fff1c9;color:#6b4e00}.b-Shipped{background:#dbeafe;color:#1d4ed8}.b-OutforDelivery{background:#e0e7ff;color:#3730a3}.b-Delivered{background:#d9f3e6;color:#0a6b43}.b-Cancelled{background:#fde1e5;color:#b3122a}
 .panel label{display:block;font-size:13px;color:#6b5550;margin-top:4px}.fx{flex:1 1 170px;width:auto!important;margin:0!important}code{background:#f3e8dc;padding:1px 6px;border-radius:4px}
-@media print{header,footer,#bn,.noprint,.skip,#skip,#toast,.steps,canvas,#live{display:none!important}.pg{padding:10px!important}.panel{box-shadow:none;border:1px solid #ccc}.two{grid-template-columns:1fr 1fr!important}}
+@media print{header,footer,#bn,.noprint,.skip,#skip,#toast,.steps,canvas,#live,#hd,#burger,#sb,#ub,.bar button{display:none!important}body{background:#fff!important;color:#000!important;padding:0!important;margin:0!important}.pg{padding:0!important;max-width:100%!important;margin:0!important}.panel{box-shadow:none!important;border:none!important;padding:0!important}.two{grid-template-columns:1fr 1fr!important}.pos-modal-backdrop{position:static!important;background:none!important;padding:0!important;display:block!important}.pos-modal-card{box-shadow:none!important;border:none!important;max-width:100%!important;width:100%!important;margin:0!important;border-radius:0!important}#print_area,#report_print_area{padding:0!important;max-width:100%!important;width:100%!important;border:none!important}}
 </style><script src="qrcode.min.js"></script>
 </head><body><a class="skip" href="#app">Skip to main content</a><div id="live" class="sr" aria-live="polite"></div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="lgG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8f1440"/><stop offset="1" stop-color="#4a0a22"/></linearGradient><linearGradient id="lgT" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe9a8"/><stop offset=".55" stop-color="#e9bd5c"/><stop offset="1" stop-color="#b8862e"/></linearGradient>
@@ -1513,8 +1513,14 @@ return `<div class="pg"><h2>Admin Panel</h2><p class="sub">Signed in as ${user.e
 let posTab = 'terminal';
 let posCart = [];
 let posPrintingBill = null;
+let posEditingBill = null;
 let posCustSearch = '';
 let posInvSearch = '';
+let posRepFrom = '';
+let posRepTo = '';
+let posRepSearch = '';
+let posPrintingReport = false;
+let posSyncing = false;
 
 function getStoreBills() {
   let b = ST('store_bills');
@@ -1528,9 +1534,11 @@ function getStoreBills() {
         items: [{ id: 'SK1000', name: 'Royal Magenta Kanchipuram Silk Saree', price: 3500, qty: 1 }],
         subtotal: 3500,
         discount: 0,
+        discountPct: 0,
         finalAmount: 3500,
         points: 35,
-        payMode: 'UPI'
+        payMode: 'UPI',
+        custPointsAfter: 35
       }
     ];
     ST('store_bills', b);
@@ -1549,7 +1557,59 @@ function getStoreCusts() {
   return c;
 }
 
+async function syncPosWithDb() {
+  if (posSyncing) return;
+  posSyncing = true;
+  const base = window.API_BASE || (location.protocol === 'http:' || location.protocol === 'https:' ? '' : 'http://localhost:3000');
+  try {
+    const c = new AbortController();
+    setTimeout(() => c.abort(), 2500);
+    const bills = getStoreBills();
+    const res = await fetch(base + '/api/pos/sync-bills/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(typeof TOK !== 'undefined' && TOK ? { 'Authorization': 'Bearer ' + TOK } : {})
+      },
+      body: JSON.stringify({ bills }),
+      signal: c.signal
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.bills && data.bills.length) {
+        ST('store_bills', data.bills);
+        const custs = getStoreCusts();
+        for (const b of data.bills) {
+          if (b.customer && b.customer.phone) {
+            let cu = custs.find(x => x.phone === b.customer.phone);
+            if (!cu) {
+              cu = {
+                code: b.customer.code || ('CUST-' + String(custs.length + 1).padStart(4, '0')),
+                name: b.customer.name,
+                phone: b.customer.phone,
+                points: b.custPointsAfter || b.points || 0,
+                totalSpent: b.finalAmount,
+                billsCount: 1
+              };
+              custs.push(cu);
+            } else {
+              cu.name = b.customer.name;
+              if (b.custPointsAfter) cu.points = b.custPointsAfter;
+            }
+          }
+        }
+        ST('store_custs', custs);
+      }
+    }
+  } catch (err) {
+    // offline mode or backend offline
+  } finally {
+    posSyncing = false;
+  }
+}
+
 function aBill() {
+  syncPosWithDb();
   const bills = getStoreBills();
   const custs = getStoreCusts();
   const todaySales = bills.reduce((sum, b) => sum + (Number(b.finalAmount) || 0), 0);
@@ -1560,7 +1620,7 @@ function aBill() {
     ['terminal', '⚡ POS Billing Counter'],
     ['invoices', '📋 Invoices & History (' + bills.length + ')'],
     ['customers', '👥 Customer Directory (' + custs.length + ')'],
-    ['react', '📊 Full React System' + (isServer ? '' : ' (Requires Server)')]
+    ['reports', '📊 Total Bills & Reports (' + bills.length + ')']
   ];
 
   return `<div style="margin-top:16px">
@@ -1568,13 +1628,13 @@ function aBill() {
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px">
         <div>
           <h3 style="margin:0;color:#5a0f2a;font-family:Georgia,serif;font-size:20px">Store Billing & POS System</h3>
-          <p style="margin:2px 0 0;font-size:12.5px;color:#777">Direct counter billing, instant invoice generation, and customer loyalty points (₹100 = 1 pt).</p>
+          <p style="margin:2px 0 0;font-size:12.5px;color:#777">Direct counter billing, instant invoice generation, edit bills, date-wise reports and customer loyalty points (₹100 = 1 pt).</p>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:12px;padding:4px 10px;border-radius:20px;font-weight:600;background:${isServer ? '#e6f7ec' : '#fff8e6'};color:${isServer ? '#0a7a4b' : '#b25e00'};border:1px solid ${isServer ? '#b2e8c4' : '#ffe099'}">
-            ${isServer ? '🟢 Live Server Connected' : '🟡 Offline Mode (Local Storage)'}
+          <span style="font-size:12px;padding:4px 10px;border-radius:20px;font-weight:600;background:#e6f7ec;color:#0a7a4b;border:1px solid #b2e8c4">
+            🟢 Live Database Synced
           </span>
-          ${isServer ? `<a href="/billing/" target="_blank" class="btn" style="padding:6px 14px;font-size:12px;background:var(--mag);color:#fff;text-decoration:none">Open Fullscreen ↗</a>` : ''}
+          <button type="button" class="btn o" onclick="syncPosWithDb().then(()=>{toast('Synced with database ✓');route()})" style="padding:4px 10px;font-size:11.5px">🔄 Sync DB</button>
         </div>
       </div>
 
@@ -1590,8 +1650,10 @@ function aBill() {
       </div>
     </div>
 
-    ${posTab === 'terminal' ? renderPosTerminal() : (posTab === 'invoices' ? renderPosInvoices() : (posTab === 'customers' ? renderPosCustomers() : renderPosReactView()))}
+    ${posTab === 'terminal' ? renderPosTerminal() : (posTab === 'invoices' ? renderPosInvoices() : (posTab === 'customers' ? renderPosCustomers() : renderPosReports()))}
     ${posPrintingBill ? renderPosPrintModal() : ''}
+    ${posEditingBill ? renderPosEditModal() : ''}
+    ${posPrintingReport ? renderPosReportPrintModal() : ''}
   </div>`;
 }
 
@@ -1686,12 +1748,22 @@ function renderPosTerminal() {
       `}
 
       <div style="background:#fdf8f4;border-radius:10px;padding:12px 14px;border:1px solid #ebd8ca;margin-bottom:14px">
-        <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px">
           <span>Subtotal:</span><b>${inr(subtotal)}</b>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:13px">
-          <span>Discount (₹):</span>
-          <input id="pos_disc" type="number" min="0" value="0" oninput="posUpdateTotals()" style="width:90px;padding:4px 8px;font-size:13px;text-align:right;margin:0">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px">
+          <span style="font-weight:600;color:#5a0f2a">Discount (%):</span>
+          <div style="display:flex;align-items:center;gap:4px">
+            <input id="pos_disc_pct" type="number" min="0" max="100" step="0.5" value="0" placeholder="0" oninput="posUpdateDiscountPct(this.value)" style="width:75px;padding:4px 8px;font-size:13px;text-align:right;margin:0;border:1px solid #ccc;border-radius:6px">
+            <span style="font-weight:700;color:#5a0f2a">%</span>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px">
+          <span style="font-weight:600;color:#5a0f2a">Discount (₹):</span>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span style="font-weight:700;color:#5a0f2a">₹</span>
+            <input id="pos_disc" type="number" min="0" value="0" placeholder="0" oninput="posUpdateDiscountAmt(this.value)" style="width:85px;padding:4px 8px;font-size:13px;text-align:right;margin:0;border:1px solid #ccc;border-radius:6px">
+          </div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px">
           <span>Payment Method:</span>
@@ -1719,6 +1791,36 @@ function renderPosTerminal() {
       </div>
     </div>
   </div>`;
+}
+
+function posUpdateDiscountPct(val) {
+  const subtotal = posCart.reduce((sum, it) => sum + it.price * it.qty, 0);
+  const pct = Math.max(0, Math.min(100, parseFloat(val) || 0));
+  const discAmt = subtotal > 0 ? Math.round(subtotal * (pct / 100)) : 0;
+  const discEl = $('#pos_disc');
+  if (discEl) discEl.value = discAmt;
+  posUpdateTotals();
+}
+
+function posUpdateDiscountAmt(val) {
+  const subtotal = posCart.reduce((sum, it) => sum + it.price * it.qty, 0);
+  const discAmt = Math.max(0, parseFloat(val) || 0);
+  const pct = subtotal > 0 ? +((discAmt / subtotal) * 100).toFixed(1) : 0;
+  const pctEl = $('#pos_disc_pct');
+  if (pctEl) pctEl.value = pct > 0 ? pct : 0;
+  posUpdateTotals();
+}
+
+function posUpdateTotals() {
+  const subtotal = posCart.reduce((sum, it) => sum + it.price * it.qty, 0);
+  const discAmt = Math.max(0, +($('#pos_disc') ? $('#pos_disc').value : 0) || 0);
+  const finalVal = Math.max(0, subtotal - discAmt);
+  const pointsVal = Math.floor(finalVal / 100);
+
+  const gEl = $('#pos_grand_total');
+  if (gEl) gEl.textContent = inr(finalVal);
+  const pEl = $('#pos_points_badge');
+  if (pEl) pEl.textContent = '+' + pointsVal + ' pts (₹100 = 1 pt)';
 }
 
 function renderPosInvoices() {
@@ -1756,7 +1858,8 @@ function renderPosInvoices() {
               <td style="text-align:right;padding:10px 8px"><b style="color:#5a0f2a">${inr(b.finalAmount)}</b></td>
               <td style="text-align:center;padding:10px 8px"><span style="background:#eafaf1;color:#0a7a4b;font-weight:700;padding:2px 6px;border-radius:4px">+${b.points || 0} pts</span></td>
               <td style="text-align:center;padding:10px 8px"><span style="font-size:11px;background:#f5efe8;padding:2px 6px;border-radius:4px">${b.payMode || 'Cash'}</span></td>
-              <td style="text-align:right;padding:10px 8px">
+              <td style="text-align:right;padding:10px 8px;white-space:nowrap">
+                <button type="button" class="btn o" onclick="posOpenEditBill('${b.id}')" style="padding:4px 8px;font-size:11px;margin-right:6px">✏ Edit</button>
                 <button type="button" class="btn o" onclick="posOpenInvoice('${b.id}')" style="padding:4px 10px;font-size:11px">🖨 Print Invoice</button>
               </td>
             </tr>
@@ -1809,33 +1912,457 @@ function renderPosCustomers() {
   </div>`;
 }
 
-function renderPosReactView() {
-  const isServer = API || (location.protocol === 'http:' || location.protocol === 'https:');
-  if (isServer) {
-    return `<div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);border:1px solid #e2e8f0;min-height:860px;position:relative">
-      <iframe id="billing_frame" src="/billing/" style="width:100%;height:880px;border:none;display:block" title="Purchase & Billing Dashboard"></iframe>
-    </div>`;
+function posSetDateFilter(type) {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const todayStr = `${yyyy}-${mm}-${dd}`;
+
+  if (type === 'today') {
+    posRepFrom = todayStr;
+    posRepTo = todayStr;
+  } else if (type === 'week') {
+    const day = now.getDay() || 7;
+    const mon = new Date(now);
+    mon.setDate(now.getDate() - day + 1);
+    const mY = mon.getFullYear();
+    const mM = String(mon.getMonth() + 1).padStart(2, '0');
+    const mD = String(mon.getDate()).padStart(2, '0');
+    posRepFrom = `${mY}-${mM}-${mD}`;
+    posRepTo = todayStr;
+  } else if (type === 'month') {
+    posRepFrom = `${yyyy}-${mm}-01`;
+    posRepTo = todayStr;
+  } else if (type === 'all') {
+    posRepFrom = '';
+    posRepTo = '';
+  }
+  route();
+}
+
+function getFilteredReportBills() {
+  const bills = getStoreBills();
+  const q = (posRepSearch || '').toLowerCase().trim();
+  return bills.filter(b => {
+    const bDate = b.iso ? b.iso.slice(0, 10) : '';
+    if (posRepFrom && bDate && bDate < posRepFrom) return false;
+    if (posRepTo && bDate && bDate > posRepTo) return false;
+    if (q) {
+      const hay = (b.id + ' ' + (b.customer ? b.customer.name + ' ' + b.customer.phone : '')).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function renderPosReports() {
+  const filtered = getFilteredReportBills();
+  const totalSales = filtered.reduce((s, b) => s + (Number(b.finalAmount) || 0), 0);
+  const totalPoints = filtered.reduce((s, b) => s + (Number(b.points) || 0), 0);
+  const avgBill = filtered.length ? Math.round(totalSales / filtered.length) : 0;
+
+  return `<div class="panel" style="background:#fff">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+      <div>
+        <h3 style="color:#5a0f2a;margin:0">Total Bills & Date-Wise Sales Reports</h3>
+        <p style="margin:2px 0 0;font-size:12.5px;color:#777">Filter bills by date range, analyze total sales, loyalty points, and download as Excel or PDF.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn" onclick="exportPosReportCSV()" style="background:#0a7a4b;color:#fff;font-size:12px;padding:7px 14px">📥 Download Excel (CSV)</button>
+        <button type="button" class="btn" onclick="exportPosReportPDF()" style="background:#5a0f2a;color:#fff;font-size:12px;padding:7px 14px">📄 Download / Print PDF</button>
+      </div>
+    </div>
+
+    <!-- Date Range Filter Bar -->
+    <div style="background:#fdf8f4;border:1px solid #ebd8ca;border-radius:12px;padding:14px;margin-bottom:18px">
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:12px;justify-content:space-between">
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <label style="font-size:12px;font-weight:700;color:#5a0f2a">From Date:</label>
+            <input type="date" value="${posRepFrom}" onchange="posRepFrom=this.value;route()" style="padding:6px 10px;font-size:12.5px;border:1px solid #ccc;border-radius:6px;background:#fff;margin:0">
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <label style="font-size:12px;font-weight:700;color:#5a0f2a">To Date:</label>
+            <input type="date" value="${posRepTo}" onchange="posRepTo=this.value;route()" style="padding:6px 10px;font-size:12.5px;border:1px solid #ccc;border-radius:6px;background:#fff;margin:0">
+          </div>
+          <div style="display:flex;gap:6px">
+            <button type="button" class="btn o" onclick="posSetDateFilter('today')" style="padding:4px 10px;font-size:11.5px">Today</button>
+            <button type="button" class="btn o" onclick="posSetDateFilter('week')" style="padding:4px 10px;font-size:11.5px">This Week</button>
+            <button type="button" class="btn o" onclick="posSetDateFilter('month')" style="padding:4px 10px;font-size:11.5px">This Month</button>
+            <button type="button" class="btn o" onclick="posSetDateFilter('all')" style="padding:4px 10px;font-size:11.5px">All Time</button>
+          </div>
+        </div>
+
+        <input type="text" placeholder="Filter by invoice, customer, phone..." value="${esc(posRepSearch)}" oninput="posRepSearch=this.value;route()" style="max-width:260px;padding:6px 10px;font-size:12px;margin:0">
+      </div>
+    </div>
+
+    <!-- Filtered Summary KPI Cards -->
+    <div class="kp" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px">
+      <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px">
+        <b style="color:#5a0f2a;font-size:22px">${inr(totalSales)}</b>
+        Filtered Total Sales
+      </div>
+      <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px">
+        <b style="color:#0a7a4b;font-size:22px">${filtered.length}</b>
+        Filtered Bills Count
+      </div>
+      <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px">
+        <b style="color:#c9a24a;font-size:22px">+${totalPoints} pts</b>
+        Filtered Total Points
+      </div>
+      <div style="background:#fdf8f5;border:1px solid #f0e1d5;border-radius:12px;padding:12px 16px">
+        <b style="color:#5a0f2a;font-size:22px">${inr(avgBill)}</b>
+        Average Bill Value
+      </div>
+    </div>
+
+    <!-- Filtered Bills Table -->
+    ${filtered.length ? `
+      <div style="overflow-x:auto">
+        <table style="width:100%;font-size:13px">
+          <thead>
+            <tr style="border-bottom:2px solid #ebd8ca;background:#fcf8f5">
+              <th style="text-align:left;padding:10px 8px">Invoice #</th>
+              <th style="text-align:left;padding:10px 8px">Date &amp; Time</th>
+              <th style="text-align:left;padding:10px 8px">Customer Name</th>
+              <th style="text-align:left;padding:10px 8px">Phone</th>
+              <th style="text-align:center;padding:10px 8px">Items</th>
+              <th style="text-align:right;padding:10px 8px">Subtotal</th>
+              <th style="text-align:right;padding:10px 8px">Discount</th>
+              <th style="text-align:right;padding:10px 8px">Final Amount</th>
+              <th style="text-align:center;padding:10px 8px">Points</th>
+              <th style="text-align:center;padding:10px 8px">Pay</th>
+              <th style="text-align:right;padding:10px 8px">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filtered.map(b => `
+              <tr style="border-bottom:1px solid #f2f2f2">
+                <td style="padding:10px 8px"><b style="color:#5a0f2a">${b.id}</b></td>
+                <td style="padding:10px 8px;color:#666">${b.date}</td>
+                <td style="padding:10px 8px"><b>${esc(b.customer ? b.customer.name : 'Walk-in')}</b></td>
+                <td style="padding:10px 8px;color:#555">${esc(b.customer ? b.customer.phone : '-')}</td>
+                <td style="text-align:center;padding:10px 8px">${(b.items || []).reduce((sum, it) => sum + (Number(it.qty) || 1), 0)}</td>
+                <td style="text-align:right;padding:10px 8px">${inr(b.subtotal || b.finalAmount)}</td>
+                <td style="text-align:right;padding:10px 8px;color:#0a7a4b">${b.discount ? '-' + inr(b.discount) : '₹0'}</td>
+                <td style="text-align:right;padding:10px 8px"><b style="color:#5a0f2a">${inr(b.finalAmount)}</b></td>
+                <td style="text-align:center;padding:10px 8px"><span style="background:#eafaf1;color:#0a7a4b;font-weight:700;padding:2px 6px;border-radius:4px">+${b.points || 0} pts</span></td>
+                <td style="text-align:center;padding:10px 8px"><span style="font-size:11px;background:#f5efe8;padding:2px 6px;border-radius:4px">${b.payMode || 'Cash'}</span></td>
+                <td style="text-align:right;padding:10px 8px;white-space:nowrap">
+                  <button type="button" class="btn o" onclick="posOpenEditBill('${b.id}')" style="padding:4px 8px;font-size:11px;margin-right:6px">✏ Edit</button>
+                  <button type="button" class="btn o" onclick="posOpenInvoice('${b.id}')" style="padding:4px 10px;font-size:11px">🖨 Print</button>
+                </td>
+              </tr>
+            `).join('')}
+            <tr style="border-top:2px solid #5a0f2a;background:#fdf8f5;font-weight:700">
+              <td colspan="4" style="padding:12px 8px;color:#5a0f2a">TOTALS (${filtered.length} Bills)</td>
+              <td style="text-align:center;padding:12px 8px">${filtered.reduce((s, b) => s + (b.items || []).reduce((is, it) => is + (Number(it.qty) || 1), 0), 0)}</td>
+              <td style="text-align:right;padding:12px 8px">${inr(filtered.reduce((s, b) => s + (Number(b.subtotal) || Number(b.finalAmount) || 0), 0))}</td>
+              <td style="text-align:right;padding:12px 8px;color:#0a7a4b">-${inr(filtered.reduce((s, b) => s + (Number(b.discount) || 0), 0))}</td>
+              <td style="text-align:right;padding:12px 8px;color:#5a0f2a;font-size:15px">${inr(totalSales)}</td>
+              <td style="text-align:center;padding:12px 8px;color:#0a7a4b">+${totalPoints} pts</td>
+              <td colspan="2"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    ` : `<p style="padding:32px 0;text-align:center;color:#888">No bills found in the selected date range.</p>`}
+  </div>`;
+}
+
+function exportPosReportCSV() {
+  const filtered = getFilteredReportBills();
+  if (!filtered.length) return toast('No bills to export in selected date range');
+
+  const headers = [
+    'Invoice Number',
+    'Date & Time',
+    'Customer Name',
+    'Phone Number',
+    'Customer Code',
+    'Items Count',
+    'Subtotal (INR)',
+    'Discount (INR)',
+    'Final Amount (INR)',
+    'Payment Method',
+    'Loyalty Points Earned'
+  ];
+
+  let csvContent = '\uFEFF' + headers.join(',') + '\n';
+
+  let totalSub = 0, totalDisc = 0, totalFinal = 0, totalPts = 0, totalItems = 0;
+
+  for (const b of filtered) {
+    const itemCount = (b.items || []).reduce((s, it) => s + (Number(it.qty) || 1), 0);
+    totalItems += itemCount;
+    totalSub += Number(b.subtotal) || Number(b.finalAmount) || 0;
+    totalDisc += Number(b.discount) || 0;
+    totalFinal += Number(b.finalAmount) || 0;
+    totalPts += Number(b.points) || 0;
+
+    const row = [
+      `"${b.id}"`,
+      `"${(b.date || '').replace(/"/g, '""')}"`,
+      `"${(b.customer ? b.customer.name : 'Walk-in').replace(/"/g, '""')}"`,
+      `"${(b.customer ? b.customer.phone : '-').replace(/"/g, '""')}"`,
+      `"${(b.customer ? b.customer.code : '-').replace(/"/g, '""')}"`,
+      itemCount,
+      b.subtotal || b.finalAmount,
+      b.discount || 0,
+      b.finalAmount,
+      `"${b.payMode || 'Cash'}"`,
+      b.points || 0
+    ];
+    csvContent += row.join(',') + '\n';
   }
 
-  return `<div class="panel" style="background:#fff;text-align:center;padding:40px 20px">
-    <div style="font-size:42px;margin-bottom:10px">💻</div>
-    <h3 style="color:#5a0f2a;margin-bottom:8px">Full React POS Dashboard</h3>
-    <p style="color:#666;max-width:540px;margin:0 auto 20px;font-size:13.5px;line-height:1.6">
-      The standalone React single-page dashboard communicates with the live MySQL database via HTTP APIs. Because you are currently running from local <code>file:///</code>, browsers restrict CORS network requests.
-    </p>
-    <div style="background:#fdf8f4;border:1px solid #ebd8ca;border-radius:12px;max-width:520px;margin:0 auto 24px;padding:16px;text-align:left">
-      <b style="color:#5a0f2a;display:block;margin-bottom:8px">To launch the Live React POS with MySQL database:</b>
-      <ol style="margin:0;padding-left:20px;font-size:13px;color:#444;line-height:1.8">
-        <li>Open terminal in the project folder</li>
-        <li>Run: <code>npm start</code></li>
-        <li>Open in browser: <a href="http://localhost:3000/#/admin/bill" target="_blank" style="color:var(--mag);font-weight:700">http://localhost:3000/#/admin/bill</a></li>
-      </ol>
-    </div>
-    <div style="display:flex;justify-content:center;gap:12px">
-      <a href="http://localhost:3000/billing/" target="_blank" class="btn" style="background:var(--mag);color:#fff;padding:10px 22px">Launch http://localhost:3000/billing/ ↗</a>
-      <button type="button" class="btn o" onclick="posTab='terminal';route()">← Return to POS Billing Counter</button>
+  csvContent += `\n"TOTALS (${filtered.length} Bills)","","","","",${totalItems},${totalSub},${totalDisc},${totalFinal},"",${totalPts}\n`;
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const dStr = posRepFrom && posRepTo ? `${posRepFrom}_to_${posRepTo}` : (posRepFrom ? `from_${posRepFrom}` : 'all_time');
+  a.href = url;
+  a.download = `Sreekrishna_Sales_Report_${dStr}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(`✓ Downloaded ${filtered.length} bills as Excel/CSV!`);
+}
+
+function exportPosReportPDF() {
+  const filtered = getFilteredReportBills();
+  if (!filtered.length) return toast('No bills to export in selected date range');
+  posPrintingReport = true;
+  route();
+}
+
+function renderPosReportPrintModal() {
+  const filtered = getFilteredReportBills();
+  const totalSales = filtered.reduce((s, b) => s + (Number(b.finalAmount) || 0), 0);
+  const totalPoints = filtered.reduce((s, b) => s + (Number(b.points) || 0), 0);
+  const periodText = (posRepFrom && posRepTo) ? `${posRepFrom} to ${posRepTo}` : (posRepFrom ? `From ${posRepFrom}` : (posRepTo ? `Up to ${posRepTo}` : 'All Time'));
+
+  return `<div class="pos-modal-backdrop" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto" onclick="if(event.target===this){posPrintingReport=false;route()}">
+    <div class="pos-modal-card" style="background:#fff;width:100%;max-width:820px;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,0.25);overflow:hidden;animation:popIn .2s ease">
+      <div class="noprint" style="background:#5a0f2a;color:#fcecd2;padding:14px 20px;display:flex;justify-content:space-between;align-items:center">
+        <b style="font-size:15px">📊 Sales &amp; Billing Report Preview</b>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn" onclick="window.print()" style="padding:6px 16px;font-size:13px;background:#f6d289;color:#5a0f2a;font-weight:700">🖨 Print / Save as PDF</button>
+          <button type="button" onclick="posPrintingReport=false;route()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer">&times;</button>
+        </div>
+      </div>
+
+      <div id="report_print_area" style="padding:28px 24px;color:#2c1b18;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">
+        <div style="text-align:center;border-bottom:2px solid #5a0f2a;padding-bottom:12px;margin-bottom:14px">
+          <h2 style="margin:0;color:#5a0f2a;font-size:24px;font-family:Georgia,serif">SREEKRISHNA TEXTILES</h2>
+          <p style="margin:2px 0;font-size:12px;color:#666">Kovai Road, Pollachi - 642002 · Phone: +91 9976392317</p>
+          <div style="margin-top:6px;font-weight:700;color:#5a0f2a;font-size:15px;letter-spacing:1px">SALES &amp; BILLING SUMMARY REPORT</div>
+          <div style="font-size:12px;color:#555;margin-top:2px">Period: <b>${periodText}</b> · Generated on: ${new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;background:#fdf8f4;border:1px solid #ebd8ca;border-radius:8px;padding:12px">
+          <div><span style="font-size:11px;color:#666;text-transform:uppercase">Total Sales</span><br><b style="color:#5a0f2a;font-size:18px">${inr(totalSales)}</b></div>
+          <div><span style="font-size:11px;color:#666;text-transform:uppercase">Bills Count</span><br><b style="color:#0a7a4b;font-size:18px">${filtered.length}</b></div>
+          <div><span style="font-size:11px;color:#666;text-transform:uppercase">Total Loyalty Awarded</span><br><b style="color:#c9a24a;font-size:18px">+${totalPoints} pts</b></div>
+        </div>
+
+        <table style="width:100%;font-size:12px;border-collapse:collapse;margin-bottom:16px">
+          <thead>
+            <tr style="border-top:1px solid #333;border-bottom:1px solid #333;background:#f8f4f0">
+              <th style="text-align:left;padding:6px 4px">Invoice #</th>
+              <th style="text-align:left;padding:6px 4px">Date</th>
+              <th style="text-align:left;padding:6px 4px">Customer</th>
+              <th style="text-align:left;padding:6px 4px">Phone</th>
+              <th style="text-align:right;padding:6px 4px">Subtotal</th>
+              <th style="text-align:right;padding:6px 4px">Discount</th>
+              <th style="text-align:right;padding:6px 4px">Final (₹)</th>
+              <th style="text-align:center;padding:6px 4px">Points</th>
+              <th style="text-align:center;padding:6px 4px">Pay</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filtered.map(b => `
+              <tr style="border-bottom:1px solid #eee">
+                <td style="padding:6px 4px"><b>${b.id}</b></td>
+                <td style="padding:6px 4px;color:#555">${b.date}</td>
+                <td style="padding:6px 4px"><b>${esc(b.customer ? b.customer.name : 'Walk-in')}</b></td>
+                <td style="padding:6px 4px">${esc(b.customer ? b.customer.phone : '-')}</td>
+                <td style="text-align:right;padding:6px 4px">${inr(b.subtotal || b.finalAmount)}</td>
+                <td style="text-align:right;padding:6px 4px;color:#0a7a4b">${b.discount ? '-' + inr(b.discount) : '₹0'}</td>
+                <td style="text-align:right;padding:6px 4px"><b>${inr(b.finalAmount)}</b></td>
+                <td style="text-align:center;padding:6px 4px">+${b.points || 0}</td>
+                <td style="text-align:center;padding:6px 4px">${b.payMode || 'Cash'}</td>
+              </tr>
+            `).join('')}
+            <tr style="border-top:2px solid #5a0f2a;font-weight:700">
+              <td colspan="4" style="padding:8px 4px;color:#5a0f2a">TOTALS</td>
+              <td style="text-align:right;padding:8px 4px">${inr(filtered.reduce((s, b) => s + (Number(b.subtotal) || Number(b.finalAmount) || 0), 0))}</td>
+              <td style="text-align:right;padding:8px 4px;color:#0a7a4b">-${inr(filtered.reduce((s, b) => s + (Number(b.discount) || 0), 0))}</td>
+              <td style="text-align:right;padding:8px 4px;color:#5a0f2a">${inr(totalSales)}</td>
+              <td style="text-align:center;padding:8px 4px;color:#0a7a4b">+${totalPoints} pts</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style="text-align:center;font-size:11px;color:#888;border-top:1px solid #eee;padding-top:10px">
+          Sreekrishna Textiles Store Management System · Generated report
+        </div>
+      </div>
     </div>
   </div>`;
+}
+
+function posOpenEditBill(invId) {
+  const bills = getStoreBills();
+  const b = bills.find(x => x.id === invId);
+  if (!b) return toast('Invoice not found');
+  posEditingBill = JSON.parse(JSON.stringify(b));
+  route();
+}
+
+function editBillRecalcPoints(val) {
+  const amt = Math.max(0, parseFloat(val) || 0);
+  const pts = Math.floor(amt / 100);
+  const pEl = $('#edit_points');
+  if (pEl) pEl.value = pts;
+}
+
+function renderPosEditModal() {
+  const b = posEditingBill;
+  if (!b) return '';
+
+  return `<div class="pos-modal-backdrop" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto" onclick="if(event.target===this){posEditingBill=null;route()}">
+    <div class="pos-modal-card" style="background:#fff;width:100%;max-width:580px;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,0.25);overflow:hidden;animation:popIn .2s ease">
+      <div class="noprint" style="background:#5a0f2a;color:#fcecd2;padding:14px 20px;display:flex;justify-content:space-between;align-items:center">
+        <b style="font-size:15px">✏ Edit Invoice #${b.id}</b>
+        <button type="button" onclick="posEditingBill=null;route()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer">&times;</button>
+      </div>
+
+      <div style="padding:22px 24px">
+        <p style="margin:0 0 16px;font-size:12.5px;color:#666">Modify customer details, final bill amount, loyalty points or payment mode. Edits save to local storage and sync directly to MySQL database.</p>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+          <div>
+            <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;color:#444">Customer Phone (10 Digits)</label>
+            <input id="edit_cust_phone" type="tel" value="${esc(b.customer ? b.customer.phone : '')}" style="margin:0">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;color:#444">Customer Name</label>
+            <input id="edit_cust_name" type="text" value="${esc(b.customer ? b.customer.name : '')}" style="margin:0">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+          <div>
+            <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;color:#444">Final Bill Amount (₹)</label>
+            <input id="edit_final_amount" type="number" min="0" value="${b.finalAmount}" oninput="editBillRecalcPoints(this.value)" style="margin:0">
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+              <label style="font-size:12px;font-weight:700;color:#444;margin:0">Loyalty Points</label>
+              <button type="button" onclick="editBillRecalcPoints($('#edit_final_amount').value)" style="font-size:10px;padding:2px 6px;background:#eafaf1;color:#0a7a4b;border:1px solid #b7ebd0;border-radius:4px;cursor:pointer">⚡ Auto Calc (₹100=1pt)</button>
+            </div>
+            <input id="edit_points" type="number" min="0" value="${b.points}" style="margin:0">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
+          <div>
+            <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;color:#444">Payment Method</label>
+            <select id="edit_pay_mode" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc;background:#fff;font-size:13px">
+              <option value="Cash" ${b.payMode === 'Cash' ? 'selected' : ''}>Cash</option>
+              <option value="UPI" ${b.payMode === 'UPI' ? 'selected' : ''}>UPI / GPay / PhonePe</option>
+              <option value="Card" ${b.payMode === 'Card' ? 'selected' : ''}>Credit / Debit Card</option>
+              <option value="Net Banking" ${b.payMode === 'Net Banking' ? 'selected' : ''}>Net Banking</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;color:#444">Invoice Date &amp; Time</label>
+            <input id="edit_date" type="text" value="${esc(b.date)}" style="margin:0">
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;justify-content:flex-end;border-top:1px solid #ebd8ca;padding-top:16px">
+          <button type="button" class="btn o" onclick="posEditingBill=null;route()">Cancel</button>
+          <button type="button" class="btn" onclick="posSaveEditedBill()" style="background:#5a0f2a;color:#fff;padding:8px 22px">💾 Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function posSaveEditedBill() {
+  if (!posEditingBill) return;
+  const bId = posEditingBill.id;
+  const newPhone = ($('#edit_cust_phone').value || '').trim().replace(/\D/g, '').slice(-10);
+  const newName = ($('#edit_cust_name').value || '').trim();
+  const newAmount = Math.max(0, +$('#edit_final_amount').value || 0);
+  const newPoints = Math.max(0, +$('#edit_points').value || 0);
+  const newPayMode = $('#edit_pay_mode').value;
+  const newDate = ($('#edit_date').value || '').trim();
+
+  if (!newName) return toast('Customer name cannot be empty');
+  if (newPhone.length !== 10) return toast('Please enter a valid 10-digit phone number');
+
+  const bills = getStoreBills();
+  const b = bills.find(x => x.id === bId);
+  if (!b) return toast('Bill not found');
+
+  const oldPoints = b.points || 0;
+  const pointsDiff = newPoints - oldPoints;
+
+  b.customer = b.customer || {};
+  b.customer.phone = newPhone;
+  b.customer.name = newName;
+  b.finalAmount = newAmount;
+  b.points = newPoints;
+  b.payMode = newPayMode;
+  if (newDate) b.date = newDate;
+
+  // Update customer directory
+  const custs = getStoreCusts();
+  let cust = custs.find(c => c.phone === newPhone || (b.customer.code && c.code === b.customer.code));
+  if (cust) {
+    cust.name = newName;
+    cust.phone = newPhone;
+    cust.points = Math.max(0, (cust.points || 0) + pointsDiff);
+    b.custPointsAfter = cust.points;
+  }
+  ST('store_custs', custs);
+  ST('store_bills', bills);
+
+  // Sync edit to MySQL backend
+  const base = window.API_BASE || (location.protocol === 'http:' || location.protocol === 'https:' ? '' : 'http://localhost:3000');
+  try {
+    fetch(base + '/api/purchases/' + encodeURIComponent(bId) + '/', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(typeof TOK !== 'undefined' && TOK ? { 'Authorization': 'Bearer ' + TOK } : {})
+      },
+      body: JSON.stringify({
+        customer_name: newName,
+        customer_phone: newPhone,
+        final_amount: newAmount,
+        points_earned: newPoints,
+        payment_method: newPayMode,
+        invoice_number: bId
+      })
+    }).then(() => console.log('Bill edit synced to MySQL ✓')).catch(e => console.warn('Patch note:', e));
+  } catch (_) {}
+
+  if (posPrintingBill && posPrintingBill.id === bId) {
+    posPrintingBill = b;
+  }
+
+  posEditingBill = null;
+  toast(`✓ Bill #${bId} updated successfully!`);
+  route();
 }
 
 function posFillProductPrice(prodId) {
@@ -1892,18 +2419,6 @@ function posRemoveItem(idx) {
   route();
 }
 
-function posUpdateTotals() {
-  const subtotal = posCart.reduce((sum, it) => sum + it.price * it.qty, 0);
-  const discount = Math.max(0, +($('#pos_disc') ? $('#pos_disc').value : 0) || 0);
-  const finalVal = Math.max(0, subtotal - discount);
-  const pointsVal = Math.floor(finalVal / 100);
-
-  const gEl = $('#pos_grand_total');
-  if (gEl) gEl.textContent = inr(finalVal);
-  const pEl = $('#pos_points_badge');
-  if (pEl) pEl.textContent = '+' + pointsVal + ' pts (₹100 = 1 pt)';
-}
-
 function posCreateBill(printNow) {
   const name = ($('#pos_cname').value || '').trim();
   const rawPhone = ($('#pos_cphone').value || '').trim();
@@ -1915,6 +2430,7 @@ function posCreateBill(printNow) {
 
   const subtotal = posCart.reduce((sum, it) => sum + it.price * it.qty, 0);
   const discount = Math.max(0, +($('#pos_disc') ? $('#pos_disc').value : 0) || 0);
+  const discountPct = Math.max(0, +($('#pos_disc_pct') ? $('#pos_disc_pct').value : 0) || 0);
   const finalAmount = Math.max(0, subtotal - discount);
   const points = Math.floor(finalAmount / 100);
   const payMode = $('#pos_pay') ? $('#pos_pay').value : 'Cash';
@@ -1951,6 +2467,7 @@ function posCreateBill(printNow) {
     items: [...posCart],
     subtotal,
     discount,
+    discountPct,
     finalAmount,
     points,
     payMode,
@@ -1959,15 +2476,22 @@ function posCreateBill(printNow) {
   bills.unshift(bill);
   ST('store_bills', bills);
 
-  // If live backend API is connected, also post to server /api/customers
-  if (API) {
-    api('POST', '/customers/', {
-      name,
-      phone_number: phone,
-      total_purchase: finalAmount,
-      bill_no: invNo
-    }).catch(e => console.warn('API bill sync note:', e));
-  }
+  // Sync directly to MySQL backend so it appears in phpMyAdmin immediately
+  const base = window.API_BASE || (location.protocol === 'http:' || location.protocol === 'https:' ? '' : 'http://localhost:3000');
+  try {
+    fetch(base + '/api/pos/sync-bills/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(typeof TOK !== 'undefined' && TOK ? { 'Authorization': 'Bearer ' + TOK } : {})
+      },
+      body: JSON.stringify({ bills: [bill] })
+    }).then(async r => {
+      if (r.ok) {
+        console.log('Bill synced to MySQL successfully ✓');
+      }
+    }).catch(e => console.warn('MySQL bill sync note:', e));
+  } catch (_) {}
 
   posCart = [];
   toast(`✓ Bill #${invNo} generated! +${points} loyalty points awarded.`);
@@ -1992,84 +2516,95 @@ function renderPosPrintModal() {
   const b = posPrintingBill;
   if (!b) return '';
 
-  return `<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto" onclick="if(event.target===this){posPrintingBill=null;route()}">
-    <div style="background:#fff;width:100%;max-width:540px;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,0.25);overflow:hidden;animation:popIn .2s ease">
-      <div class="noprint" style="background:#5a0f2a;color:#fcecd2;padding:12px 18px;display:flex;justify-content:space-between;align-items:center">
-        <b style="font-size:14px">Tax Invoice / Bill Preview</b>
-        <div style="display:flex;gap:8px">
-          <button type="button" class="btn" onclick="window.print()" style="padding:4px 12px;font-size:12px;background:#f6d289;color:#5a0f2a;font-weight:700">🖨 Print Invoice</button>
-          <button type="button" onclick="posPrintingBill=null;route()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer">&times;</button>
+  return `<div class="pos-modal-backdrop" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto" onclick="if(event.target===this){posPrintingBill=null;route()}">
+    <div class="pos-modal-card" style="background:#fff;width:100%;max-width:680px;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,0.25);overflow:hidden;animation:popIn .2s ease">
+      <div class="noprint" style="background:#5a0f2a;color:#fcecd2;padding:14px 20px;display:flex;justify-content:space-between;align-items:center">
+        <b style="font-size:15px">Tax Invoice / Bill Preview</b>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button type="button" class="btn o" onclick="posOpenEditBill('${b.id}')" style="padding:4px 10px;font-size:12px;background:#fff;color:#5a0f2a">✏ Edit Bill</button>
+          <button type="button" class="btn" onclick="window.print()" style="padding:6px 16px;font-size:13px;background:#f6d289;color:#5a0f2a;font-weight:700">🖨 Print Invoice / Save PDF</button>
+          <button type="button" onclick="posPrintingBill=null;route()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer">&times;</button>
         </div>
       </div>
 
-      <div id="print_area" style="padding:28px 24px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:#2c1b18">
-        <div style="text-align:center;border-bottom:2px dashed #b3122a;padding-bottom:14px;margin-bottom:14px">
-          <h2 style="margin:0;color:#5a0f2a;font-size:22px;font-family:Georgia,serif;letter-spacing:1px">SREEKRISHNA TEXTILES</h2>
-          <p style="margin:2px 0;font-size:11.5px;color:#777">Tradition Meets Elegance · Heritage Silks & Sarees</p>
-          <p style="margin:2px 0;font-size:11px;color:#555">Kovai Road, Pollachi - 642002 · Phone: +91 9976392317</p>
-          <div style="margin-top:6px;display:inline-block;padding:2px 10px;background:#fdf8f4;border:1px solid #ebd8ca;border-radius:4px;font-size:11px;font-weight:700;color:#5a0f2a">
+      <div id="print_area" style="padding:28px 32px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:#2c1b18;line-height:1.5">
+        <div style="text-align:center;border-bottom:2px dashed #b3122a;padding-bottom:14px;margin-bottom:16px">
+          <h2 style="margin:0;color:#5a0f2a;font-size:24px;font-family:Georgia,serif;letter-spacing:1px">SREEKRISHNA TEXTILES</h2>
+          <p style="margin:3px 0;font-size:12px;color:#777">Tradition Meets Elegance · Heritage Silks &amp; Sarees</p>
+          <p style="margin:2px 0;font-size:11.5px;color:#555">Kovai Road, Pollachi - 642002 · Phone: +91 9976392317</p>
+          <div style="margin-top:8px;display:inline-block;padding:3px 14px;background:#fdf8f4;border:1px solid #ebd8ca;border-radius:4px;font-size:11.5px;font-weight:700;color:#5a0f2a;letter-spacing:1px">
             RETAIL TAX INVOICE
           </div>
         </div>
 
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:14px;line-height:1.6">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px;margin-bottom:18px;line-height:1.6">
           <div>
-            <b>Billed To:</b><br>
-            <span style="font-size:13px;font-weight:700">${esc(b.customer ? b.customer.name : 'Walk-in')}</span><br>
-            Phone: ${esc(b.customer ? b.customer.phone : '-')}<br>
-            Cust Code: <code>${esc(b.customer ? b.customer.code : '-')}</code>
+            <span style="font-size:11px;color:#888;text-transform:uppercase;font-weight:700">Billed To:</span><br>
+            <span style="font-size:15px;font-weight:700;color:#2c1b18">${esc(b.customer ? b.customer.name : 'Walk-in')}</span><br>
+            Phone: <b>${esc(b.customer ? b.customer.phone : '-')}</b><br>
+            Customer Code: <code style="font-weight:700;color:#5a0f2a">${esc(b.customer ? b.customer.code : '-')}</code>
           </div>
           <div style="text-align:right">
-            <b>Invoice: ${b.id}</b><br>
-            Date: ${b.date}<br>
-            Payment: <b>${b.payMode || 'Cash'}</b>
+            <span style="font-size:11px;color:#888;text-transform:uppercase;font-weight:700">Invoice Details:</span><br>
+            <b style="font-size:15px;color:#5a0f2a">${b.id}</b><br>
+            Date: <b>${b.date}</b><br>
+            Payment Mode: <span style="background:#f5efe8;padding:2px 8px;border-radius:4px;font-weight:600">${b.payMode || 'Cash'}</span>
           </div>
         </div>
 
-        <table style="width:100%;font-size:12px;border-collapse:collapse;margin-bottom:14px">
+        <table style="width:100%;font-size:13px;border-collapse:collapse;margin-bottom:16px">
           <thead>
-            <tr style="border-top:1px solid #333;border-bottom:1px solid #333">
-              <th style="text-align:left;padding:6px 2px">Item</th>
-              <th style="text-align:center;padding:6px 2px">Qty</th>
-              <th style="text-align:right;padding:6px 2px">Price</th>
-              <th style="text-align:right;padding:6px 2px">Total</th>
+            <tr style="border-top:2px solid #5a0f2a;border-bottom:2px solid #5a0f2a;background:#fcf8f5">
+              <th style="text-align:left;padding:8px 6px">Item Description</th>
+              <th style="text-align:center;padding:8px 6px">Qty</th>
+              <th style="text-align:right;padding:8px 6px">Unit Price</th>
+              <th style="text-align:right;padding:8px 6px">Total</th>
             </tr>
           </thead>
           <tbody>
             ${(b.items || []).map(it => `
-              <tr style="border-bottom:1px solid #eee">
-                <td style="padding:6px 2px"><b>${esc(it.name)}</b></td>
-                <td style="text-align:center;padding:6px 2px">${it.qty}</td>
-                <td style="text-align:right;padding:6px 2px">${inr(it.price)}</td>
-                <td style="text-align:right;padding:6px 2px"><b>${inr(it.price * it.qty)}</b></td>
+              <tr style="border-bottom:1px solid #f0e6dd">
+                <td style="padding:9px 6px"><b>${esc(it.name)}</b></td>
+                <td style="text-align:center;padding:9px 6px">${it.qty}</td>
+                <td style="text-align:right;padding:9px 6px">${inr(it.price)}</td>
+                <td style="text-align:right;padding:9px 6px"><b>${inr(it.price * it.qty)}</b></td>
               </tr>
             `).join('')}
           </tbody>
         </table>
 
-        <div style="border-top:2px dashed #b3122a;padding-top:10px;margin-bottom:14px;font-size:13px">
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-            <span>Subtotal:</span><span>${inr(b.subtotal)}</span>
+        <div style="border-top:2px dashed #b3122a;padding-top:12px;margin-bottom:16px;font-size:13.5px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+            <span>Subtotal:</span><span>${inr(b.subtotal || b.finalAmount)}</span>
           </div>
           ${b.discount ? `
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#0a7a4b">
-              <span>Discount:</span><span>-${inr(b.discount)}</span>
+            <div style="display:flex;justify-content:space-between;margin-bottom:5px;color:#0a7a4b">
+              <span>Discount${b.discountPct ? ' (' + b.discountPct + '%)' : ''}:</span>
+              <span>-${inr(b.discount)}</span>
             </div>
           ` : ''}
-          <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;color:#5a0f2a;border-top:1px solid #ccc;padding-top:6px">
+          <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;color:#5a0f2a;border-top:2px solid #ebd8ca;padding-top:8px">
             <span>Grand Total:</span><span>${inr(b.finalAmount)}</span>
           </div>
         </div>
 
-        <div style="background:#fdf8f4;border:1px dashed #c9a24a;border-radius:8px;padding:10px;text-align:center;margin-bottom:14px">
+        <div style="background:#fdf8f4;border:1px dashed #c9a24a;border-radius:10px;padding:12px 14px;text-align:center;margin-bottom:16px">
           <span style="font-size:11px;color:#8a5e1e;font-weight:700;letter-spacing:1px;text-transform:uppercase;display:block">Customer Loyalty Rewards</span>
-          <b style="font-size:15px;color:#0a7a4b">+${b.points || 0} Points Earned on this Bill</b>
-          <small style="display:block;color:#666;font-size:11px;margin-top:2px">Total Loyalty Points Balance: <b>${b.custPointsAfter || b.points || 0} pts</b> (₹100 = 1 pt)</small>
+          <b style="font-size:16px;color:#0a7a4b">+${b.points || 0} Points Earned on this Bill</b>
+          <small style="display:block;color:#666;font-size:11.5px;margin-top:3px">Total Customer Loyalty Points Balance: <b>${b.custPointsAfter || b.points || 0} pts</b> (₹100 = 1 pt)</small>
         </div>
 
-        <div style="text-align:center;font-size:11px;color:#777;border-top:1px solid #eee;padding-top:10px">
-          <p style="margin:0 0 2px;font-weight:600;color:#5a0f2a">Thank you for shopping with Sreekrishna Textiles!</p>
-          <p style="margin:0">Goods once sold cannot be returned. Exchange within 7 days with bill.</p>
+        <div style="text-align:center;font-size:11.5px;color:#777;border-top:1px solid #ebd8ca;padding-top:12px">
+          <p style="margin:0 0 3px;font-weight:700;color:#5a0f2a">Thank you for shopping with Sreekrishna Textiles!</p>
+          <p style="margin:0">Goods once sold cannot be returned. Exchange within 7 days with this bill.</p>
+        </div>
+      </div>
+
+      <div class="noprint" style="background:#fcf8f5;border-top:1px solid #ebd8ca;padding:12px 20px;display:flex;justify-content:space-between;align-items:center">
+        <button type="button" class="btn o" onclick="posOpenEditBill('${b.id}')" style="font-size:12px">✏ Edit this Bill</button>
+        <div style="display:flex;gap:10px">
+          <button type="button" class="btn o" onclick="posPrintingBill=null;route()" style="font-size:12px">Close</button>
+          <button type="button" class="btn" onclick="window.print()" style="background:#5a0f2a;color:#fff;font-size:12px;padding:6px 18px">🖨 Print Invoice / Save PDF</button>
         </div>
       </div>
     </div>

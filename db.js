@@ -277,6 +277,10 @@ async function init() {
     await pool.query('UPDATE products SET unit_price = price WHERE unit_price IS NULL OR unit_price = 0');
   } catch (_) {}
 
+  try {
+    await pool.query("ALTER TABLE purchases ADD COLUMN payment_method VARCHAR(50) DEFAULT 'Cash'");
+  } catch (_) {}
+
   return pool;
 }
 

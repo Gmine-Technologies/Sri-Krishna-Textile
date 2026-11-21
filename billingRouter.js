@@ -747,12 +747,13 @@ router.post('/api/purchases/', authMiddleware, async (req, res) => {
 
     const customInv = (invoice_number || bill_no || '').trim();
     const invoiceNum = customInv || await getNextInvoiceNumber(conn, recordType);
+    const paymentMethod = req.body.payment_method || req.body.pay_mode || req.body.payMode || 'Cash';
 
     // Insert purchase / sale
     const [purchRes] = await conn.query(
-      `INSERT INTO purchases (invoice_number, customer_id, record_type, subtotal, discount_amount, tax_amount, final_amount, points_earned, status, created_by_id, idempotency_key)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?)`,
-      [invoiceNum, customer_id, recordType, subtotal, discount, tax, finalAmount, pointsEarned, req.user.user_id, idempotency_key || null]
+      `INSERT INTO purchases (invoice_number, customer_id, record_type, subtotal, discount_amount, tax_amount, final_amount, points_earned, status, created_by_id, idempotency_key, payment_method)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?)`,
+      [invoiceNum, customer_id, recordType, subtotal, discount, tax, finalAmount, pointsEarned, req.user.user_id, idempotency_key || null, paymentMethod]
     );
     const purchaseId = purchRes.insertId;
 
@@ -826,20 +827,39 @@ router.get('/api/purchases/:id/', authMiddleware, async (req, res) => {
   }
 });
 
-// PATCH /api/purchases/:id/ - Edit bill no, amount, points
+// PATCH /api/purchases/:id/ - Edit bill no, amount, points, customer, payment
 router.patch('/api/purchases/:id/', authMiddleware, async (req, res) => {
   const pool = getPool();
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
 
-    const [pRows] = await conn.query('SELECT * FROM purchases WHERE id = ? FOR UPDATE', [req.params.id]);
+    const [pRows] = await conn.query('SELECT * FROM purchases WHERE id = ? OR invoice_number = ? FOR UPDATE', [req.params.id, req.params.id]);
     if (pRows.length === 0) throw new Error('Purchase not found.');
     const purchase = pRows[0];
 
     const newInvoice = req.body.invoice_number || req.body.bill_no;
     const newAmount = req.body.final_amount !== undefined ? req.body.final_amount : req.body.amount;
     let newPoints = req.body.points_earned !== undefined ? req.body.points_earned : req.body.points;
+    const newCustName = req.body.customer_name || req.body.name;
+    const newCustPhone = req.body.customer_phone || req.body.phone;
+    const newPayMode = req.body.payment_method || req.body.pay_mode || req.body.payMode;
+
+    // 0. Update customer details if provided
+    if (newCustName || newCustPhone) {
+      if (newCustName && newCustPhone) {
+        await conn.query('UPDATE customers SET name = ?, phone_number = ? WHERE id = ?', [newCustName.trim(), newCustPhone.trim(), purchase.customer_id]);
+      } else if (newCustName) {
+        await conn.query('UPDATE customers SET name = ? WHERE id = ?', [newCustName.trim(), purchase.customer_id]);
+      } else if (newCustPhone) {
+        await conn.query('UPDATE customers SET phone_number = ? WHERE id = ?', [newCustPhone.trim(), purchase.customer_id]);
+      }
+    }
+
+    // 0.1 Update payment method if provided
+    if (newPayMode) {
+      await conn.query('UPDATE purchases SET payment_method = ? WHERE id = ?', [newPayMode, purchase.id]);
+    }
 
     // 1. Bill no check
     if (newInvoice !== undefined) {
@@ -906,6 +926,108 @@ router.patch('/api/purchases/:id/', authMiddleware, async (req, res) => {
   } catch (err) {
     await conn.rollback();
     res.status(400).json({ error: err.message });
+  } finally {
+    conn.release();
+  }
+});
+
+// POST /api/pos/sync-bills/ - Bidirectional sync between POS counter and MySQL database
+router.post('/api/pos/sync-bills/', authMiddleware, async (req, res) => {
+  const { bills } = req.body;
+  const pool = getPool();
+  const conn = await pool.getConnection();
+  try {
+    if (Array.isArray(bills) && bills.length > 0) {
+      for (const b of bills) {
+        if (!b || !b.id) continue;
+        const invNum = String(b.id).trim();
+        const [existing] = await conn.query('SELECT id FROM purchases WHERE invoice_number = ?', [invNum]);
+        if (existing.length === 0) {
+          const phone = b.customer && b.customer.phone ? String(b.customer.phone).replace(/\D/g, '').slice(-10) : '9999999999';
+          const name = b.customer && b.customer.name ? String(b.customer.name).trim() : 'Store Customer';
+          let custId = 1;
+          const [cRows] = await conn.query('SELECT id, total_loyalty_points FROM customers WHERE phone_number = ?', [phone]);
+          if (cRows.length === 0) {
+            const nextCode = await getNextCustomerCode(conn, b.customer ? b.customer.code : null);
+            const [cRes] = await conn.query(
+              'INSERT INTO customers (customer_code, name, phone_number, is_active, total_loyalty_points) VALUES (?, ?, ?, 1, ?)',
+              [nextCode, name, phone, b.points || 0]
+            );
+            custId = cRes.insertId;
+          } else {
+            custId = cRows[0].id;
+            await conn.query('UPDATE customers SET total_loyalty_points = total_loyalty_points + ? WHERE id = ?', [b.points || 0, custId]);
+          }
+
+          const subtotal = Number(b.subtotal) || Number(b.finalAmount) || 0;
+          const discount = Number(b.discount) || 0;
+          const finalAmt = Number(b.finalAmount) || Math.max(0, subtotal - discount);
+          const points = Number(b.points) !== undefined ? Number(b.points) : Math.floor(finalAmt / 100);
+          const payMode = b.payMode || b.payment_method || 'Cash';
+          const createdAt = b.iso ? new Date(b.iso) : new Date();
+
+          const [pRes] = await conn.query(
+            `INSERT INTO purchases (invoice_number, customer_id, record_type, subtotal, discount_amount, tax_amount, final_amount, points_earned, status, created_by_id, payment_method, created_at)
+             VALUES (?, ?, 'sale', ?, ?, 0, ?, ?, 'completed', ?, ?, ?)`,
+            [invNum, custId, subtotal, discount, finalAmt, points, req.user.user_id, payMode, createdAt]
+          );
+          const pId = pRes.insertId;
+
+          // Insert items
+          const items = Array.isArray(b.items) && b.items.length > 0 ? b.items : [{ name: 'Store Garment', price: finalAmt, qty: 1 }];
+          for (const it of items) {
+            const itPrice = Number(it.price) || 0;
+            const itQty = Number(it.qty || it.quantity) || 1;
+            await conn.query(
+              `INSERT INTO purchase_items (purchase_id, product_name_snapshot, product_sku_snapshot, unit_price, quantity, line_total)
+               VALUES (?, ?, 'MANUAL', ?, ?, ?)`,
+              [pId, it.name || 'Store Item', itPrice, itQty, itPrice * itQty]
+            );
+          }
+
+          // Insert loyalty transaction
+          if (points > 0) {
+            const [custNew] = await conn.query('SELECT total_loyalty_points FROM customers WHERE id = ?', [custId]);
+            const newBal = custNew.length > 0 ? custNew[0].total_loyalty_points : points;
+            await conn.query(
+              `INSERT INTO loyalty_transactions (customer_id, purchase_id, transaction_type, points_change, description, resulting_balance, created_by_id, created_at)
+               VALUES (?, ?, 'award', ?, ?, ?, ?, ?)`,
+              [custId, pId, points, `Loyalty points for bill #${invNum} (₹${finalAmt})`, newBal, req.user.user_id, createdAt]
+            );
+          }
+        }
+      }
+    }
+
+    const [allPurchases] = await pool.query(
+      `SELECT p.*, c.name as customer_name, c.customer_code, c.phone_number as customer_phone, c.total_loyalty_points as customer_points
+       FROM purchases p JOIN customers c ON p.customer_id = c.id
+       ORDER BY p.id DESC`
+    );
+
+    const billsMapped = allPurchases.map(p => ({
+      id: p.invoice_number,
+      dbId: p.id,
+      date: new Date(p.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+      iso: new Date(p.created_at).toISOString(),
+      customer: {
+        id: p.customer_id,
+        name: p.customer_name,
+        phone: p.customer_phone,
+        code: p.customer_code
+      },
+      subtotal: Number(p.subtotal),
+      discount: Number(p.discount_amount),
+      finalAmount: Number(p.final_amount),
+      points: Number(p.points_earned),
+      payMode: p.payment_method || 'Cash',
+      custPointsAfter: Number(p.customer_points)
+    }));
+
+    res.json({ success: true, count: billsMapped.length, bills: billsMapped });
+  } catch (err) {
+    console.error('POS sync error:', err);
+    res.status(500).json({ error: err.message });
   } finally {
     conn.release();
   }
