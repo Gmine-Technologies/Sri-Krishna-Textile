@@ -1005,24 +1005,40 @@ router.post('/api/pos/sync-bills/', authMiddleware, async (req, res) => {
        ORDER BY p.id DESC`
     );
 
-    const billsMapped = allPurchases.map(p => ({
-      id: p.invoice_number,
-      dbId: p.id,
-      date: new Date(p.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
-      iso: new Date(p.created_at).toISOString(),
-      customer: {
-        id: p.customer_id,
-        name: p.customer_name,
-        phone: p.customer_phone,
-        code: p.customer_code
-      },
-      subtotal: Number(p.subtotal),
-      discount: Number(p.discount_amount),
-      finalAmount: Number(p.final_amount),
-      points: Number(p.points_earned),
-      payMode: p.payment_method || 'Cash',
-      custPointsAfter: Number(p.customer_points)
-    }));
+    const [allItems] = await pool.query('SELECT * FROM purchase_items ORDER BY id ASC');
+    const itemsByPurchaseId = {};
+    for (const item of allItems) {
+      if (!itemsByPurchaseId[item.purchase_id]) itemsByPurchaseId[item.purchase_id] = [];
+      itemsByPurchaseId[item.purchase_id].push({
+        id: item.product_id ? String(item.product_id) : 'MANUAL',
+        name: item.product_name_snapshot,
+        price: Number(item.unit_price),
+        qty: Number(item.quantity)
+      });
+    }
+
+    const billsMapped = allPurchases.map(p => {
+      const pItems = itemsByPurchaseId[p.id] || [];
+      return {
+        id: p.invoice_number,
+        dbId: p.id,
+        date: new Date(p.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+        iso: new Date(p.created_at).toISOString(),
+        customer: {
+          id: p.customer_id,
+          name: p.customer_name,
+          phone: p.customer_phone,
+          code: p.customer_code
+        },
+        items: pItems.length ? pItems : [{ name: 'Store Garment', price: Number(p.final_amount), qty: 1 }],
+        subtotal: Number(p.subtotal),
+        discount: Number(p.discount_amount),
+        finalAmount: Number(p.final_amount),
+        points: Number(p.points_earned),
+        payMode: p.payment_method || 'Cash',
+        custPointsAfter: Number(p.customer_points)
+      };
+    });
 
     res.json({ success: true, count: billsMapped.length, bills: billsMapped });
   } catch (err) {

@@ -124,8 +124,11 @@ select,.panel input,.panel select,.bar input{color:var(--ink);background:#fff}.b
 .evs{list-style:none;padding:0;margin:0}.evs li{padding:10px 0;border-bottom:1px solid #eadccf}.evs li.new{background:#fff6e0;padding-left:8px;border-left:3px solid var(--gold)}
 .bdg{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;background:#eddcd0}.b-Processing{background:#fff1c9;color:#6b4e00}.b-Shipped{background:#dbeafe;color:#1d4ed8}.b-OutforDelivery{background:#e0e7ff;color:#3730a3}.b-Delivered{background:#d9f3e6;color:#0a6b43}.b-Cancelled{background:#fde1e5;color:#b3122a}
 .panel label{display:block;font-size:13px;color:#6b5550;margin-top:4px}.fx{flex:1 1 170px;width:auto!important;margin:0!important}code{background:#f3e8dc;padding:1px 6px;border-radius:4px}
-@media print{header,footer,#bn,.noprint,.skip,#skip,#toast,.steps,canvas,#live,#hd,#burger,#sb,#ub,.bar button{display:none!important}body{background:#fff!important;color:#000!important;padding:0!important;margin:0!important}.pg{padding:0!important;max-width:100%!important;margin:0!important}.panel{box-shadow:none!important;border:none!important;padding:0!important}.two{grid-template-columns:1fr 1fr!important}.pos-modal-backdrop{position:static!important;background:none!important;padding:0!important;display:block!important}.pos-modal-card{box-shadow:none!important;border:none!important;max-width:100%!important;width:100%!important;margin:0!important;border-radius:0!important}#print_area,#report_print_area{padding:0!important;max-width:100%!important;width:100%!important;border:none!important}}
-</style><script src="qrcode.min.js"></script>
+@media print{header,footer,#bn,.noprint,.skip,#skip,#toast,.steps,canvas,#live,#hd,#burger,#sb,#ub,.bar button{display:none!important}body{background:#fff!important;color:#000!important;padding:0!important;margin:0!important}body.has-pos-modal > *:not(#app),body.has-pos-modal #app > *:not(.pos-modal-backdrop),body.has-pos-modal .pg > *:not(.pos-modal-backdrop),body.has-pos-modal .panel:not(.pos-modal-card),body.has-pos-modal .two,body.has-pos-modal h1,body.has-pos-modal p.sub,body.has-pos-modal .kp{display:none!important}.pg{padding:0!important;max-width:100%!important;margin:0!important}.panel{box-shadow:none!important;border:none!important;padding:0!important}.two{grid-template-columns:1fr 1fr!important}.pos-modal-backdrop{position:static!important;background:none!important;padding:0!important;display:block!important}.pos-modal-card{box-shadow:none!important;border:none!important;max-width:100%!important;width:100%!important;margin:0!important;border-radius:0!important}#print_area,#report_print_area{padding:0!important;max-width:100%!important;width:100%!important;border:none!important}}
+</style>
+<script src="qrcode.min.js"></script>
+<script src="jspdf.min.js"></script>
+<script src="jspdf.autotable.min.js"></script>
 </head><body><a class="skip" href="#app">Skip to main content</a><div id="live" class="sr" aria-live="polite"></div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="lgG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8f1440"/><stop offset="1" stop-color="#4a0a22"/></linearGradient><linearGradient id="lgT" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe9a8"/><stop offset=".55" stop-color="#e9bd5c"/><stop offset="1" stop-color="#b8862e"/></linearGradient>
 <symbol id="lg" viewBox="0 0 260 112"><path d="M14 44Q14 28 34 28H104Q120 28 130 17Q140 28 156 28H226Q246 28 246 44V84Q246 104 226 104H34Q14 104 14 84Z" fill="url(#lgG)" stroke="url(#lgT)" stroke-width="4"/><path d="M21 45Q21 34 36 34H104Q121 34 130 24Q139 34 156 34H224Q239 34 239 45V83Q239 97 224 97H36Q21 97 21 83Z" fill="none" stroke="#e9bd5c" stroke-width="1.2" opacity=".85"/>
@@ -1543,6 +1546,11 @@ function getStoreBills() {
     ];
     ST('store_bills', b);
   }
+  b.forEach(bill => {
+    if (!bill.items || !Array.isArray(bill.items) || bill.items.length === 0) {
+      bill.items = [{ name: 'Store Garment / Saree', price: Number(bill.finalAmount) || 0, qty: 1 }];
+    }
+  });
   return b;
 }
 
@@ -1883,6 +1891,7 @@ function renderPosInvoices() {
                 <td style="text-align:center;padding:10px 8px"><span style="font-size:11px;background:#f5efe8;padding:2px 6px;border-radius:4px">${b.payMode || 'Cash'}</span></td>
                 <td style="text-align:right;padding:10px 8px;white-space:nowrap">
                   <button type="button" class="btn o" onclick="posOpenEditBill('${b.id}')" style="padding:4px 8px;font-size:11px;margin-right:6px">✏ Edit</button>
+                  <button type="button" class="btn o" onclick="downloadPosInvoicePDF('${b.id}')" style="padding:4px 8px;font-size:11px;margin-right:6px;background:#eafaf1;color:#0a7a4b;border-color:#b8e6ce">📥 PDF</button>
                   <button type="button" class="btn o" onclick="posOpenInvoice('${b.id}')" style="padding:4px 10px;font-size:11px">🖨 Print Invoice</button>
                 </td>
               </tr>
@@ -2051,7 +2060,8 @@ function renderPosReports() {
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button type="button" class="btn" onclick="exportPosReportCSV()" style="background:#0a7a4b;color:#fff;font-size:12px;padding:7px 14px">📥 Download Excel (CSV)</button>
-        <button type="button" class="btn" onclick="exportPosReportPDF()" style="background:#5a0f2a;color:#fff;font-size:12px;padding:7px 14px">📄 Download / Print PDF</button>
+        <button type="button" class="btn" onclick="downloadPosReportPDFDirect()" style="background:#5a0f2a;color:#fff;font-size:12px;padding:7px 14px">📥 Download PDF</button>
+        <button type="button" class="btn o" onclick="exportPosReportPDF()" style="font-size:12px;padding:7px 14px;color:#5a0f2a;border-color:#5a0f2a">🖨 Print / Preview Report</button>
       </div>
     </div>
 
@@ -2215,6 +2225,208 @@ function exportPosReportCSV() {
   toast(`✓ Downloaded ${filtered.length} bills as Excel/CSV!`);
 }
 
+function posPrintClean(elementId, title) {
+  const src = document.getElementById(elementId);
+  if (!src) return window.print();
+
+  let f = document.getElementById('pos_clean_print_frame');
+  if (f) f.remove();
+
+  f = document.createElement('iframe');
+  f.id = 'pos_clean_print_frame';
+  f.style.position = 'fixed';
+  f.style.right = '0';
+  f.style.bottom = '0';
+  f.style.width = '0';
+  f.style.height = '0';
+  f.style.border = '0';
+  f.style.visibility = 'hidden';
+  document.body.appendChild(f);
+
+  const doc = f.contentWindow.document;
+  doc.open();
+  doc.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${title || 'Print Document'}</title>
+  <style>
+    @page { size: auto; margin: 8mm 10mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 12px 18px;
+      color: #2c1b18;
+      background: #fff;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    h2 { font-family: Georgia, serif; letter-spacing: 1px; color: #5a0f2a; margin: 0; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 12.5px; }
+    th { border-top: 2px solid #5a0f2a; border-bottom: 2px solid #5a0f2a; background: #fdf8f4; padding: 7px 6px; font-weight: 700; color: #5a0f2a; }
+    td { padding: 7px 6px; border-bottom: 1px solid #ebd8ca; }
+    .noprint { display: none !important; }
+    b { color: #5a0f2a; }
+  </style>
+</head>
+<body>
+  ${src.innerHTML}
+</body>
+</html>`);
+  doc.close();
+
+  setTimeout(() => {
+    try {
+      f.contentWindow.focus();
+      f.contentWindow.print();
+    } catch (e) {
+      console.warn('Iframe print error, falling back:', e);
+      window.print();
+    }
+  }, 250);
+}
+
+function downloadPosReportPDFDirect() {
+  const filtered = getFilteredReportBills();
+  if (!filtered.length) return toast('No bills to export in selected date range');
+
+  if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
+    return posPrintClean('report_print_area', 'Sales & Billing Summary Report');
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  // Store Header
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(90, 15, 42);
+  doc.text('SREEKRISHNA TEXTILES', 105, 14, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(100, 100, 100);
+  doc.text('Kovai Road, Pollachi - 642002  |  Phone: +91 9976392317', 105, 19, { align: 'center' });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(90, 15, 42);
+  doc.text('SALES & BILLING SUMMARY REPORT', 105, 25, { align: 'center' });
+
+  const periodText = (posRepFrom && posRepTo) ? `${posRepFrom} to ${posRepTo}` : (posRepFrom ? `From ${posRepFrom}` : (posRepTo ? `Up to ${posRepTo}` : 'All Time'));
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(80, 80, 80);
+  doc.text(`Period: ${periodText}    |    Generated: ${new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}`, 105, 30, { align: 'center' });
+
+  doc.setDrawColor(90, 15, 42);
+  doc.setLineWidth(0.4);
+  doc.line(14, 33, 196, 33);
+
+  // Summary Metrics Box
+  const totalSales = filtered.reduce((s, b) => s + (Number(b.finalAmount) || 0), 0);
+  const totalPoints = filtered.reduce((s, b) => s + (Number(b.points) || 0), 0);
+  const totalSub = filtered.reduce((s, b) => s + (Number(b.subtotal) || Number(b.finalAmount) || 0), 0);
+  const totalDisc = filtered.reduce((s, b) => s + (Number(b.discount) || 0), 0);
+
+  doc.setFillColor(253, 248, 244);
+  doc.roundedRect(14, 36, 182, 13, 2, 2, 'F');
+  doc.setFontSize(8);
+  doc.setTextColor(100, 100, 100);
+  doc.text('TOTAL SALES:', 18, 41);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(90, 15, 42);
+  doc.text(`Rs. ${totalSales.toLocaleString('en-IN')}`, 42, 41);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 100, 100);
+  doc.text('BILLS COUNT:', 78, 41);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(10, 122, 75);
+  doc.text(`${filtered.length}`, 103, 41);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 100, 100);
+  doc.text('LOYALTY PTS:', 125, 41);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(201, 162, 74);
+  doc.text(`+${totalPoints} pts`, 150, 41);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 100, 100);
+  doc.text('AVG BILL:', 18, 46);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(90, 15, 42);
+  doc.text(`Rs. ${Math.round(totalSales / (filtered.length || 1)).toLocaleString('en-IN')}`, 37, 46);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 100, 100);
+  doc.text('DISCOUNT:', 78, 46);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(10, 122, 75);
+  doc.text(`-Rs. ${totalDisc.toLocaleString('en-IN')}`, 100, 46);
+
+  // Table Data
+  const head = [['Inv #', 'Date', 'Customer', 'Phone', 'Items', 'Subtotal', 'Discount', 'Final (Rs)', 'Points', 'Pay']];
+  const body = filtered.map(b => [
+    b.id,
+    b.date ? b.date.slice(0, 11) : '',
+    b.customer ? b.customer.name : 'Walk-in',
+    b.customer ? b.customer.phone : '-',
+    (b.items || []).reduce((s, it) => s + (Number(it.qty) || 1), 0),
+    `Rs. ${(Number(b.subtotal) || Number(b.finalAmount) || 0).toLocaleString('en-IN')}`,
+    b.discount ? `-Rs. ${Number(b.discount).toLocaleString('en-IN')}` : '0',
+    `Rs. ${Number(b.finalAmount).toLocaleString('en-IN')}`,
+    `+${b.points || 0}`,
+    b.payMode || 'Cash'
+  ]);
+
+  body.push([
+    'TOTALS', '', '', '',
+    filtered.reduce((s, b) => s + (b.items || []).reduce((is, it) => is + (Number(it.qty) || 1), 0), 0),
+    `Rs. ${totalSub.toLocaleString('en-IN')}`,
+    `-Rs. ${totalDisc.toLocaleString('en-IN')}`,
+    `Rs. ${totalSales.toLocaleString('en-IN')}`,
+    `+${totalPoints}`,
+    ''
+  ]);
+
+  const autoTableFn = (doc.autoTable || (window.jspdf && window.jspdf.autoTable));
+  if (autoTableFn) {
+    autoTableFn.call(doc, {
+      startY: 52,
+      head: head,
+      body: body,
+      theme: 'grid',
+      headStyles: { fillColor: [90, 15, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5 },
+      bodyStyles: { fontSize: 7, textColor: [40, 40, 40] },
+      alternateRowStyles: { fillColor: [253, 248, 245] },
+      margin: { left: 14, right: 14 },
+      columnStyles: {
+        0: { cellWidth: 26, fontStyle: 'bold' },
+        4: { halign: 'center' },
+        5: { halign: 'right' },
+        6: { halign: 'right' },
+        7: { halign: 'right', fontStyle: 'bold' },
+        8: { halign: 'center' },
+        9: { halign: 'center' }
+      },
+      didParseCell: function(data) {
+        if (data.row.index === body.length - 1) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fillColor = [250, 240, 230];
+          data.cell.styles.textColor = [90, 15, 42];
+        }
+      }
+    });
+  }
+
+  const dStr = posRepFrom && posRepTo ? `${posRepFrom}_to_${posRepTo}` : (posRepFrom ? `from_${posRepFrom}` : 'all_time');
+  doc.save(`Sreekrishna_Sales_Report_${dStr}.pdf`);
+  toast('✓ Sales Report PDF downloaded successfully!');
+}
+
 function exportPosReportPDF() {
   const filtered = getFilteredReportBills();
   if (!filtered.length) return toast('No bills to export in selected date range');
@@ -2233,7 +2445,8 @@ function renderPosReportPrintModal() {
       <div class="noprint" style="background:#5a0f2a;color:#fcecd2;padding:14px 20px;display:flex;justify-content:space-between;align-items:center">
         <b style="font-size:15px">📊 Sales &amp; Billing Report Preview</b>
         <div style="display:flex;gap:8px">
-          <button type="button" class="btn" onclick="window.print()" style="padding:6px 16px;font-size:13px;background:#f6d289;color:#5a0f2a;font-weight:700">🖨 Print / Save as PDF</button>
+          <button type="button" class="btn" onclick="downloadPosReportPDFDirect()" style="padding:6px 14px;font-size:12.5px;background:#0a7a4b;color:#fff;font-weight:700">📥 Download PDF</button>
+          <button type="button" class="btn" onclick="posPrintClean('report_print_area', 'Sales &amp; Billing Report')" style="padding:6px 16px;font-size:12.5px;background:#f6d289;color:#5a0f2a;font-weight:700">🖨 Print Report</button>
           <button type="button" onclick="posPrintingReport=false;route()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer">&times;</button>
         </div>
       </div>
@@ -2586,6 +2799,156 @@ function posCreateBill(printNow) {
   }
 }
 
+function downloadPosInvoicePDF(invId) {
+  const bills = getStoreBills();
+  const b = bills.find(x => x.id === invId) || posPrintingBill;
+  if (!b) return toast('Invoice not found');
+
+  if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
+    return posPrintClean('print_area', 'Tax Invoice ' + b.id);
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  // Store Brand Header
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(20);
+  doc.setTextColor(90, 15, 42);
+  doc.text('SREEKRISHNA TEXTILES', 105, 18, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(110, 110, 110);
+  doc.text('Tradition Meets Elegance · Heritage Silks & Sarees', 105, 23, { align: 'center' });
+  doc.text('Kovai Road, Pollachi - 642002  |  Phone: +91 9976392317', 105, 27.5, { align: 'center' });
+
+  doc.setFillColor(253, 248, 244);
+  doc.roundedRect(70, 31, 70, 7, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(90, 15, 42);
+  doc.text('RETAIL TAX INVOICE', 105, 36, { align: 'center' });
+
+  // Invoice & Customer Info Box
+  doc.setDrawColor(235, 216, 202);
+  doc.setLineWidth(0.3);
+  doc.line(14, 42, 196, 42);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(120, 120, 120);
+  doc.text('BILLED TO:', 16, 48);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(40, 20, 25);
+  doc.text(b.customer ? b.customer.name : 'Walk-in', 16, 54);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(80, 80, 80);
+  doc.text(`Phone: ${b.customer ? b.customer.phone : '-'}`, 16, 59);
+  doc.text(`Customer Code: ${b.customer && b.customer.code ? b.customer.code : '-'}`, 16, 64);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(120, 120, 120);
+  doc.text('INVOICE DETAILS:', 130, 48);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(90, 15, 42);
+  doc.text(b.id, 130, 54);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(80, 80, 80);
+  doc.text(`Date: ${b.date}`, 130, 59);
+  doc.text(`Payment: ${b.payMode || 'Cash'}`, 130, 64);
+
+  // Items Table
+  const items = (b.items && b.items.length) ? b.items : [{ name: 'Store Garment', price: b.finalAmount, qty: 1 }];
+  const head = [['#', 'Item Description', 'Qty', 'Unit Price (Rs)', 'Total (Rs)']];
+  const body = items.map((it, idx) => [
+    idx + 1,
+    it.name,
+    it.qty,
+    `Rs. ${(Number(it.price) || 0).toLocaleString('en-IN')}`,
+    `Rs. ${((Number(it.price) || 0) * (Number(it.qty) || 1)).toLocaleString('en-IN')}`
+  ]);
+
+  const autoTableFn = (doc.autoTable || (window.jspdf && window.jspdf.autoTable));
+  if (autoTableFn) {
+    autoTableFn.call(doc, {
+      startY: 70,
+      head: head,
+      body: body,
+      theme: 'grid',
+      headStyles: { fillColor: [90, 15, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      bodyStyles: { fontSize: 8.5, textColor: [40, 40, 40] },
+      alternateRowStyles: { fillColor: [253, 248, 245] },
+      margin: { left: 14, right: 14 },
+      columnStyles: {
+        0: { cellWidth: 12, halign: 'center' },
+        2: { cellWidth: 16, halign: 'center' },
+        3: { cellWidth: 32, halign: 'right' },
+        4: { cellWidth: 34, halign: 'right', fontStyle: 'bold' }
+      }
+    });
+  }
+
+  let finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 6 : 140;
+
+  doc.setDrawColor(179, 18, 42);
+  doc.setLineDashPattern([2, 2], 0);
+  doc.line(14, finalY, 196, finalY);
+  doc.setLineDashPattern([], 0);
+
+  finalY += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(80, 80, 80);
+  doc.text('Subtotal:', 125, finalY);
+  doc.text(`Rs. ${(Number(b.subtotal) || Number(b.finalAmount) || 0).toLocaleString('en-IN')}`, 196, finalY, { align: 'right' });
+
+  if (b.discount) {
+    finalY += 5;
+    doc.setTextColor(10, 122, 75);
+    doc.text(`Discount${b.discountPct ? ' (' + b.discountPct + '%)' : ''}:`, 125, finalY);
+    doc.text(`-Rs. ${Number(b.discount).toLocaleString('en-IN')}`, 196, finalY, { align: 'right' });
+  }
+
+  finalY += 7;
+  doc.setDrawColor(235, 216, 202);
+  doc.line(125, finalY - 2, 196, finalY - 2);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(90, 15, 42);
+  doc.text('Grand Total:', 125, finalY + 3);
+  doc.text(`Rs. ${Number(b.finalAmount).toLocaleString('en-IN')}`, 196, finalY + 3, { align: 'right' });
+
+  // Loyalty rewards banner
+  finalY += 12;
+  doc.setFillColor(234, 250, 241);
+  doc.roundedRect(14, finalY, 182, 14, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(10, 122, 75);
+  doc.text(`CUSTOMER LOYALTY REWARDS: +${b.points || 0} Points Earned on this Bill`, 105, finalY + 6, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(50, 50, 50);
+  doc.text(`Total Loyalty Points Balance: ${b.custPointsAfter || b.points || 0} pts (Rs. 100 = 1 pt)`, 105, finalY + 11, { align: 'center' });
+
+  // Thank you note
+  finalY += 22;
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(9);
+  doc.setTextColor(100, 100, 100);
+  doc.text('Thank you for shopping with Sreekrishna Textiles!', 105, finalY, { align: 'center' });
+  doc.text('Goods once sold can be exchanged within 7 days with original invoice.', 105, finalY + 4.5, { align: 'center' });
+
+  doc.save(`Invoice_${b.id}.pdf`);
+  toast(`✓ Downloaded Invoice ${b.id} as PDF!`);
+}
+
 function posOpenInvoice(invId) {
   const bills = getStoreBills();
   const b = bills.find(x => x.id === invId);
@@ -2604,7 +2967,8 @@ function renderPosPrintModal() {
         <b style="font-size:15px">Tax Invoice / Bill Preview</b>
         <div style="display:flex;gap:8px;align-items:center">
           <button type="button" class="btn o" onclick="posOpenEditBill('${b.id}')" style="padding:4px 10px;font-size:12px;background:#fff;color:#5a0f2a">✏ Edit Bill</button>
-          <button type="button" class="btn" onclick="window.print()" style="padding:6px 16px;font-size:13px;background:#f6d289;color:#5a0f2a;font-weight:700">🖨 Print Invoice / Save PDF</button>
+          <button type="button" class="btn" onclick="downloadPosInvoicePDF('${b.id}')" style="padding:6px 14px;font-size:12.5px;background:#0a7a4b;color:#fff;font-weight:700">📥 Download Invoice PDF</button>
+          <button type="button" class="btn" onclick="posPrintClean('print_area', 'Tax Invoice ${b.id}')" style="padding:6px 16px;font-size:12.5px;background:#f6d289;color:#5a0f2a;font-weight:700">🖨 Print Invoice</button>
           <button type="button" onclick="posPrintingBill=null;route()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer">&times;</button>
         </div>
       </div>
@@ -3180,6 +3544,7 @@ else if(k=='login'||k=='register')out=auth(k=='register');else if(k=='forgot'||k
 else if(k=='p'&&PAGES[h[1]])out=`<div class="pg"><h2>${PAGES[h[1]][0]}</h2><div class="panel">${PAGES[h[1]][1]}</div></div>`;else out='<div class="pg"><h2>Page not found</h2></div>';
 const _ae=document.activeElement;const _aid=(_ae&&(_ae.tagName==='INPUT'||_ae.tagName==='TEXTAREA'||_ae.tagName==='SELECT'))?_ae.id:null;const _ass=_ae&&typeof _ae.selectionStart==='number'?_ae.selectionStart:null;const _ase=_ae&&typeof _ae.selectionEnd==='number'?_ae.selectionEnd:null;
 app.innerHTML=out;
+document.body.classList.toggle('has-pos-modal', !!(posPrintingBill || posPrintingReport));
 if(_aid){const _res=document.getElementById(_aid);if(_res){_res.focus();if(_ass!==null&&_ase!==null){try{_res.setSelectionRange(_ass,_ase)}catch(_){}}}}
 {const t=app.querySelector('.pg h2');if(t){const h1=document.createElement('h1');h1.className=t.className;h1.setAttribute('style',t.getAttribute('style')||'');h1.innerHTML=t.innerHTML;t.replaceWith(h1)}const hh=app.querySelector('h1');document.title=(hh?hh.textContent+' | ':'')+'Sreekrishna Textiles';if(lastH&&!same&&!_aid)app.focus({preventScroll:true})}if(k=='c'||k=='s'){const key=k=='s'?'s':h[1]||'sarees';bindF(key,()=>{const y=scrollY;route();scrollTo(0,y)})}
 if(!k){petals($('#pt'));$('#hero').classList.add('on');$('#hv').style.display='none';if(!ready){ready=true}else{$('#hb').style.transform='none'}auto=setInterval(tick,7000)}
