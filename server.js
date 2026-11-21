@@ -164,12 +164,35 @@ app.post('/api/auth/register', limit, wrap(async (q, s) => {
 }));
 
 app.post('/api/auth/login', limit, wrap(async (q, s) => {
-  const email = String(q.body.email || '').trim().toLowerCase();
-  const u = await db.get('SELECT * FROM users WHERE email=?', [email]);
-  if (!u || !bcrypt.compareSync(String(q.body.password || ''), u.hash)) throw err(401, 'Invalid email or password');
+  const ident = String(q.body.email || q.body.username || '').trim().toLowerCase();
+  const u = await db.get('SELECT * FROM users WHERE email=? OR username=?', [ident, ident]);
+  const pw = String(q.body.password || '');
+  const pwHash = u ? (u.hash || u.password) : null;
+  if (!u || !pwHash || !bcrypt.compareSync(pw, pwHash)) throw err(401, 'Invalid email or password');
   if (q.body.role === 'admin' && u.role !== 'admin') throw err(403, 'This is not an admin account');
-  if (q.body.role !== 'admin' && u.role === 'admin') throw err(403, 'Admin accounts must log in from /#/admin');
-  s.json({ token: sign(u), user: pubU(u) });
+  if (!q.body.username && q.body.role !== 'admin' && u.role === 'admin') throw err(403, 'Admin accounts must log in from /#/admin');
+
+  const billingAuth = require('./billingAuth');
+  const tokens = billingAuth.generateTokens(u);
+
+  s.json({
+    token: sign(u),
+    access: tokens.access,
+    refresh: tokens.refresh,
+    user: {
+      id: u.id,
+      name: u.name,
+      username: u.username || u.name,
+      email: u.email,
+      first_name: u.first_name || u.name,
+      last_name: u.last_name || '',
+      role: u.role,
+      phone: u.phone || '',
+      address: u.address || '',
+      is_staff: Boolean(u.is_staff || u.role === 'admin'),
+      is_superuser: Boolean(u.is_superuser || u.role === 'admin')
+    }
+  });
 }));
 
 // ---------- SMTP & Email OTP Endpoints ----------
@@ -766,6 +789,10 @@ app.get('/api/products/:id/image/download', async (q, s) => {
   s.status(404).send('Image not found in database');
 });
 
+
+const billingRouter = require('./billingRouter');
+app.use(billingRouter);
+
 app.use('/api', (q, s) => s.status(404).json({ error: 'Not found' }));
 
 // Images are stored ONLY in MySQL database and fetched ONLY from MySQL database
@@ -816,6 +843,8 @@ app.get('/favicon.ico', (q, s) => s.sendFile(path.join(__dirname, 'public', 'fav
 app.get('/favicon.svg', (q, s) => { s.type('image/svg+xml'); s.sendFile(path.join(__dirname, 'public', 'favicon.svg')); });
 app.get('/apple-touch-icon.png', (q, s) => s.sendFile(path.join(__dirname, 'public', 'apple-touch-icon.png')));
 app.get('/og-image.png', (q, s) => s.sendFile(path.join(__dirname, 'public', 'og-image.png')));
+
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 async function startServer() {

@@ -182,6 +182,101 @@ async function init() {
     await pool.query('ALTER TABLE orders ADD COLUMN pay_ref VARCHAR(100) DEFAULT NULL');
   } catch (_) {}
 
+  // Billing & Purchase Management Tables (from purchasedb.sql)
+  for (const q of [
+    'ALTER TABLE users ADD COLUMN username VARCHAR(150) NULL UNIQUE',
+    'ALTER TABLE users ADD COLUMN password VARCHAR(255) NULL',
+    'ALTER TABLE users ADD COLUMN is_superuser TINYINT(1) DEFAULT 0',
+    'ALTER TABLE users ADD COLUMN is_staff TINYINT(1) DEFAULT 0',
+    'ALTER TABLE users ADD COLUMN is_active TINYINT(1) DEFAULT 1',
+    'ALTER TABLE users ADD COLUMN first_name VARCHAR(150) DEFAULT ""',
+    'ALTER TABLE users ADD COLUMN last_name VARCHAR(150) DEFAULT ""',
+    'ALTER TABLE products ADD COLUMN unit_price DECIMAL(12,2) DEFAULT NULL',
+    'ALTER TABLE products ADD COLUMN is_active TINYINT(1) DEFAULT 1'
+  ]) {
+    try { await pool.query(q); } catch (_) {}
+  }
+
+  try {
+    await pool.query('UPDATE users SET password = hash WHERE password IS NULL OR password = ""');
+  } catch (_) {}
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS customers (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      customer_code VARCHAR(50) NOT NULL UNIQUE,
+      name VARCHAR(200) NOT NULL,
+      phone_number VARCHAR(20) NOT NULL,
+      email VARCHAR(254) NULL,
+      address TEXT NULL,
+      is_active TINYINT(1) DEFAULT 1,
+      total_loyalty_points INT DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_cust_phone (phone_number),
+      INDEX idx_cust_name (name),
+      INDEX idx_cust_code (customer_code)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS purchases (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      invoice_number VARCHAR(60) NOT NULL UNIQUE,
+      customer_id INT NOT NULL,
+      record_type VARCHAR(20) NOT NULL DEFAULT 'sale',
+      subtotal DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+      discount_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+      tax_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+      final_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+      points_earned INT NOT NULL DEFAULT 0,
+      status VARCHAR(20) NOT NULL DEFAULT 'completed',
+      idempotency_key VARCHAR(120) NULL UNIQUE,
+      created_by_id INT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_purch_inv (invoice_number),
+      INDEX idx_purch_type (record_type),
+      INDEX idx_purch_status (status),
+      INDEX idx_purch_created (created_at),
+      INDEX idx_purch_cust (customer_id, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS purchase_items (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      purchase_id INT NOT NULL,
+      product_id VARCHAR(64) NULL,
+      product_name_snapshot VARCHAR(200) NOT NULL,
+      product_sku_snapshot VARCHAR(50) NOT NULL,
+      unit_price DECIMAL(12,2) NOT NULL,
+      quantity INT NOT NULL DEFAULT 1,
+      line_total DECIMAL(12,2) NOT NULL,
+      INDEX idx_item_purch (purchase_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS loyalty_transactions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      customer_id INT NOT NULL,
+      purchase_id INT NULL,
+      transaction_type VARCHAR(20) NOT NULL DEFAULT 'award',
+      points_change INT NOT NULL,
+      description VARCHAR(255) NOT NULL,
+      resulting_balance INT NOT NULL,
+      created_by_id INT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_loyalty_cust (customer_id, created_at),
+      INDEX idx_loyalty_type (transaction_type)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `);
+
+  try {
+    await pool.query('UPDATE products SET unit_price = price WHERE unit_price IS NULL OR unit_price = 0');
+  } catch (_) {}
+
   return pool;
 }
 

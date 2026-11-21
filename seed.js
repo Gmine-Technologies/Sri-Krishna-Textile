@@ -17,15 +17,20 @@ module.exports = async function seed(db) {
   const adminEmail = (process.env.ADMIN_EMAIL || 'admin@sreekrishna.demo').toLowerCase();
   const adminPass = process.env.ADMIN_PASSWORD || 'admin123';
 
-  const admin = await db.get("SELECT 1 FROM users WHERE role='admin'");
+  const admin = await db.get("SELECT * FROM users WHERE role='admin' OR username='admin' LIMIT 1");
   if (!admin) {
     await db.run(
-      'INSERT INTO users(name,email,hash,role,created) VALUES(?,?,?,?,?)',
-      ['Admin', adminEmail, bcrypt.hashSync(adminPass, 10), 'admin', new Date().toISOString()]
+      'INSERT INTO users(name,email,username,password,hash,role,is_staff,is_superuser,is_active,created) VALUES(?,?,?,?,?,?,?,?,?,?)',
+      ['Admin', adminEmail, 'admin', bcrypt.hashSync(adminPass, 10), bcrypt.hashSync(adminPass, 10), 'admin', 1, 1, 1, new Date().toISOString()]
     );
     if (adminPass === 'admin123') {
       console.warn('WARNING: default admin password in use. Set ADMIN_PASSWORD before deploying.');
     }
+  } else {
+    await db.run(
+      "UPDATE users SET username = COALESCE(username, 'admin'), is_staff = 1, is_superuser = 1, is_active = 1, password = COALESCE(password, hash) WHERE id = ?",
+      [admin.id]
+    );
   }
 
   const prodCount = await db.get('SELECT COUNT(*) AS n FROM products');

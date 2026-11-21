@@ -4,5 +4,6 @@ data/*.db*
 data/uploads/*
 !data/uploads/.gitkeep
 product_images/
+scratch/
 
 .serena/
